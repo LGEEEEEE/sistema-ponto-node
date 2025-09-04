@@ -481,14 +481,23 @@ app.get('/', (req, res) => {
 // =================================================================
 // FUNÇÕES E INICIALIZAÇÃO DO SERVIDOR
 // =================================================================
+// =================================================================
+// FUNÇÕES E INICIALIZAÇÃO DO SERVIDOR
+// =================================================================
 async function iniciarSistema() {
     const adminEmail = process.env.ADMIN_EMAIL || 'rh@empresa.com';
     const adminSenha = process.env.ADMIN_SENHA || 'senha123';
+
+    // --- CORREÇÃO APLICADA AQUI ---
     const [empresa, criada] = await Empresa.findOrCreate({
-        where: { id: 1 },
+        where: { nome: 'Empresa Matriz (Padrão)' },
         defaults: { nome: 'Empresa Matriz (Padrão)' }
     });
-    if (criada) { console.log(`Empresa Padrão (ID: 1) criada.`); }
+
+    if (criada) { 
+        console.log(`Empresa Padrão (ID: ${empresa.id}) criada.`); 
+    }
+
     const userExists = await User.findOne({ where: { email: adminEmail } });
     if (!userExists) {
         const senhaHash = await bcrypt.hash(adminSenha, 10);
