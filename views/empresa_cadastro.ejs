@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastrar Empresa - Sistema de Ponto</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px 0; }
+        .auth-container { background-color: #ffffff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); width: 100%; max-width: 480px; text-align: center; }
+        h1 { color: #333; margin-bottom: 10px; font-size: 24px; }
+        h2 { color: #555; margin-bottom: 24px; font-size: 16px; font-weight: 400; }
+        .input-field { width: 100%; padding: 12px 15px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        .input-field:focus { outline: none; border-color: #2980b9; }
+        .submit-btn { width: 100%; padding: 12px; background-color: #27ae60; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: background-color 0.2s; }
+        .submit-btn:hover { background-color: #2ecc71; }
+        .switch-link { margin-top: 20px; font-size: 14px; }
+        .switch-link a { color: #2980b9; text-decoration: none; font-weight: 600; }
+        hr { border: 0; height: 1px; background-color: #eee; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="auth-container">
+        <h1>Bem-vindo ao Sistema de Ponto!</h1>
+        <h2>Cadastre sua empresa e comece a usar.</h2>
+
+        <form action="/empresa/cadastrar" method="POST">
+            <input class="input-field" type="text" name="nomeEmpresa" placeholder="Nome da Empresa" required>
+            <input class="input-field" type="text" name="cnpj" placeholder="CNPJ (Opcional)">
+
+            <hr>
+
+            <input class="input-field" type="text" name="nomeAdmin" placeholder="Seu Nome Completo (Admin)" required>
+            <input class="input-field" type="email" name="emailAdmin" placeholder="Seu Email (será seu login)" required>
+            <input class="input-field" type="password" name="senhaAdmin" placeholder="Crie uma Senha" required>
+
+            <button class="submit-btn" type="submit">Finalizar Cadastro</button>
+        </form>
+        <p class="switch-link">
+            Já tem uma conta de RH? <a href="/rh/login">Faça login</a>
+        </p>
+    </div>
+</body>
+</html>

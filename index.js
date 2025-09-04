@@ -20,26 +20,25 @@ const port = process.env.PORT || 3000;
 let sequelize;
 
 if (process.env.NODE_ENV === 'production') {
-    // Se estiver em produção (no Render), usa a DATABASE_URL com PostgreSQL
     sequelize = new Sequelize(process.env.DATABASE_URL, {
         dialect: 'postgres',
         protocol: 'postgres',
         dialectOptions: {
-            ssl: {
-                require: true,
-                rejectUnauthorized: false // Necessário para a conexão no Render
-            }
+            ssl: { require: true, rejectUnauthorized: false }
         }
     });
 } else {
-    // Se estiver no seu computador, continua usando o SQLite
     sequelize = new Sequelize({
         dialect: 'sqlite',
         storage: './database.sqlite'
     });
 }
 
-// Modelo de Usuário
+// Modelos
+const Empresa = sequelize.define('Empresa', {
+    nome: { type: DataTypes.STRING, allowNull: false },
+    cnpj: { type: DataTypes.STRING, allowNull: true, unique: true }
+});
 const User = sequelize.define('User', {
     nome: { type: DataTypes.STRING, allowNull: false },
     email: { type: DataTypes.STRING, allowNull: false, unique: true },
@@ -48,26 +47,24 @@ const User = sequelize.define('User', {
     horarioEntrada: { type: DataTypes.TIME, allowNull: true },
     horarioSaida: { type: DataTypes.TIME, allowNull: true }
 });
-
-// Modelo de Registro de Ponto
 const RegistroPonto = sequelize.define('RegistroPonto', {
     timestamp: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
     tipo: { type: DataTypes.STRING, allowNull: false }
 });
-
-// Modelo de Férias
 const Ferias = sequelize.define('Ferias', {
     dataInicio: { type: DataTypes.DATEONLY, allowNull: false },
     dataFim: { type: DataTypes.DATEONLY, allowNull: false }
 });
-
-// Modelo de Configuração
 const Configuracao = sequelize.define('Configuracao', {
-    chave: { type: DataTypes.STRING, allowNull: false, unique: true },
+    chave: { type: DataTypes.STRING, allowNull: false },
     valor: { type: DataTypes.STRING, allowNull: false }
 });
 
 // Relacionamentos
+Empresa.hasMany(User);
+User.belongsTo(Empresa);
+Empresa.hasMany(Configuracao);
+Configuracao.belongsTo(Empresa);
 User.hasMany(RegistroPonto);
 RegistroPonto.belongsTo(User);
 User.hasMany(Ferias);
@@ -83,10 +80,7 @@ app.set('trust proxy', true);
 app.use(express.urlencoded({ extended: true }));
 
 app.use(session({
-    store: new SQLiteStore({
-        db: 'sessions.sqlite',
-        concurrentDB: true
-    }),
+    store: new SQLiteStore({ db: 'sessions.sqlite', concurrentDB: true }),
     secret: 'um-segredo-muito-forte-para-proteger-as-sessoes',
     resave: false,
     saveUninitialized: false,
@@ -117,12 +111,10 @@ async function checarAutorizacaoRH(req, res, next) {
 function restringirPorIP(req, res, next) {
     const allowedIps = (process.env.ALLOWED_IPS || '').split(',');
     if (allowedIps.length === 0 || allowedIps[0] === '') {
-        console.warn('AVISO: Nenhuma lista de IPs permitidos foi configurada. Permitindo acesso por padrão.');
         return next();
     }
     const userIp = req.ip;
-    console.log(`Tentativa de acesso do IP: ${userIp}. IPs permitidos: ${allowedIps}`);
-    if (allowedIps.includes(userIp)) {
+    if (allowedIps.includes(userIp) || userIp === '::1') {
         next();
     } else {
         res.status(403).send('Acesso negado. Você só pode bater o ponto a partir da rede da empresa.');
@@ -135,7 +127,6 @@ function calcularHorasTrabalhadas(registros) {
     const saidaAlmoco = registrosDoDia.find(r => r.tipo === 'Saida Almoço');
     const voltaAlmoco = registrosDoDia.find(r => r.tipo === 'Volta Almoço');
     const saida = registrosDoDia.find(r => r.tipo === 'Saida');
-
     if (!entrada || !saida) {
         return 'Jornada em aberto';
     }
@@ -143,9 +134,7 @@ function calcularHorasTrabalhadas(registros) {
     const saidaTimestamp = new Date(saida.timestamp);
     let intervaloMs = 0;
     if (saidaAlmoco && voltaAlmoco) {
-        const saidaAlmocoTimestamp = new Date(saidaAlmoco.timestamp);
-        const voltaAlmocoTimestamp = new Date(voltaAlmoco.timestamp);
-        intervaloMs = voltaAlmocoTimestamp - saidaAlmocoTimestamp;
+        intervaloMs = new Date(voltaAlmoco.timestamp) - new Date(saidaAlmoco.timestamp);
     }
     const totalTrabalhadoMs = (saidaTimestamp - entradaTimestamp) - intervaloMs;
     const horas = Math.floor(totalTrabalhadoMs / 3600000);
@@ -153,36 +142,18 @@ function calcularHorasTrabalhadas(registros) {
     return `${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m`;
 }
 
-// A NOVA versão da função
-// A NOVA versão da função com horário padrão
 function getHorarioExpediente(usuario, data) {
-    // 1. Define o horário padrão da empresa
-    const horarioPadrao = {
-        entrada: '09:00:00',
-        saida: '18:00:00'
-    };
-
-    // 2. Usa o horário do funcionário, se existir. Se não, usa o padrão.
+    const horarioPadrao = { entrada: '09:00:00', saida: '18:00:00' };
     const horario = {
         entrada: usuario.horarioEntrada || horarioPadrao.entrada,
         saida: usuario.horarioSaida || horarioPadrao.saida
     };
-
-    const diaDaSemana = data.getDay(); // 5 = Sexta-feira
-
-    // 3. Aplica a regra da sexta-feira sobre o horário apurado (padrão ou customizado)
-    if (diaDaSemana === 5) {
-        // Ajusta a entrada (1 hora mais cedo)
+    if (data.getDay() === 5) { // Sexta-feira
         const [horaEntrada, minutoEntrada, segundoEntrada] = horario.entrada.split(':');
-        const horaEntradaSexta = parseInt(horaEntrada, 10) - 1;
-        horario.entrada = `${horaEntradaSexta.toString().padStart(2, '0')}:${minutoEntrada}:${segundoEntrada}`;
-
-        // Ajusta a saída (1 hora mais cedo)
+        horario.entrada = `${(parseInt(horaEntrada, 10) - 1).toString().padStart(2, '0')}:${minutoEntrada}:${segundoEntrada}`;
         const [horaSaida, minutoSaida, segundoSaida] = horario.saida.split(':');
-        const horaSaidaSexta = parseInt(horaSaida, 10) - 1;
-        horario.saida = `${horaSaidaSexta.toString().padStart(2, '0')}:${minutoSaida}:${segundoSaida}`;
+        horario.saida = `${(parseInt(horaSaida, 10) - 1).toString().padStart(2, '0')}:${minutoSaida}:${segundoSaida}`;
     }
-
     return horario;
 }
 
@@ -191,62 +162,86 @@ function getHorarioExpediente(usuario, data) {
 // ROTAS DA APLICAÇÃO
 // =================================================================
 
-// --- Rotas de Autenticação (Públicas) ---
-app.get('/cadastro', (req, res) => {
-    res.render('cadastro');
+// --- Rota de Cadastro de Empresa ---
+app.get('/empresa/cadastrar', (req, res) => {
+    res.render('empresa_cadastro');
 });
 
-app.post('/cadastro', async (req, res) => {
-    const { nome, email, senha } = req.body;
+app.post('/empresa/cadastrar', async (req, res) => {
+    const { nomeEmpresa, cnpj, nomeAdmin, emailAdmin, senhaAdmin } = req.body;
+    const t = await sequelize.transaction();
     try {
-        const senhaHash = await bcrypt.hash(senha, 10);
-        await User.create({ nome, email, senha: senhaHash });
-        res.redirect('/login');
+        const novaEmpresa = await Empresa.create({ nome: nomeEmpresa, cnpj: cnpj }, { transaction: t });
+        const senhaHash = await bcrypt.hash(senhaAdmin, 10);
+        await User.create({
+            nome: nomeAdmin,
+            email: emailAdmin,
+            senha: senhaHash,
+            role: 'rh',
+            EmpresaId: novaEmpresa.id
+        }, { transaction: t });
+        await t.commit();
+        res.redirect('/rh/login');
     } catch (error) {
-        console.error("Erro no cadastro:", error);
-        res.status(500).send('Erro ao cadastrar usuário. O e-mail já pode estar em uso.');
+        await t.rollback();
+        console.error("Erro no cadastro de empresa:", error);
+        res.status(500).send('Erro ao cadastrar nova empresa. O email ou CNPJ já pode estar em uso.');
     }
 });
 
-app.get('/login', (req, res) => {
-    res.render('login');
+// --- Rotas de Autenticação ---
+app.get('/cadastro', checarAutenticacao, checarAutorizacaoRH, (req, res) => {
+    res.render('cadastro');
 });
+
+app.post('/cadastro', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
+    const { nome, email, senha } = req.body;
+    try {
+        const senhaHash = await bcrypt.hash(senha, 10);
+        await User.create({
+            nome, email, senha: senhaHash,
+            EmpresaId: req.session.empresaId
+        });
+        res.redirect('/rh/dashboard');
+    } catch (error) {
+        console.error("Erro no cadastro de funcionário:", error);
+        res.status(500).send('Erro ao cadastrar funcionário. O e-mail já pode estar em uso.');
+    }
+});
+
+app.get('/login', (req, res) => { res.render('login'); });
 
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
-    const user = await User.findOne({ where: { email } });
-
+    const user = await User.findOne({ where: { email, role: 'funcionario' } });
     if (user && await bcrypt.compare(senha, user.senha)) {
         req.session.userId = user.id;
         req.session.userRole = user.role;
+        req.session.empresaId = user.EmpresaId;
         res.redirect('/dashboard');
     } else {
-        res.render('login', { error: 'Email ou senha incorretos. Por favor, tente novamente.' });
+        res.render('login', { error: 'Email ou senha incorretos.' });
     }
 });
 
 app.post('/logout', (req, res) => {
     req.session.destroy(err => {
-        if (err) {
-            return res.redirect('/dashboard');
-        }
+        if (err) { return res.redirect('/dashboard'); }
         res.clearCookie('connect.sid');
         res.redirect('/login');
     });
 });
 
 // --- Rotas de Autenticação do RH ---
-app.get('/rh/login', (req, res) => {
-    res.render('rh_login');
-});
+app.get('/rh/login', (req, res) => { res.render('rh_login'); });
 
 app.post('/rh/login', async (req, res) => {
     const { email, senha } = req.body;
-    const user = await User.findOne({ where: { email } });
-
-    if (user && await bcrypt.compare(senha, user.senha) && user.role === 'rh') {
+    const user = await User.findOne({ where: { email, role: 'rh' } });
+    if (user && await bcrypt.compare(senha, user.senha)) {
         req.session.userId = user.id;
         req.session.userRole = user.role;
+        req.session.empresaId = user.EmpresaId;
         res.redirect('/rh/dashboard');
     } else {
         res.render('rh_login', { error: 'Credenciais inválidas ou sem permissão de acesso.' });
@@ -259,12 +254,8 @@ app.get('/dashboard', checarAutenticacao, async (req, res) => {
     const user = await User.findByPk(req.session.userId);
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-
     const registros = await RegistroPonto.findAll({
-        where: {
-            UserId: req.session.userId,
-            timestamp: { [Op.gte]: hoje }
-        },
+        where: { UserId: req.session.userId, timestamp: { [Op.gte]: hoje } },
         order: [['timestamp', 'ASC']]
     });
     res.render('dashboard', { user, registros, query: req.query });
@@ -275,21 +266,15 @@ app.post('/registrar', checarAutenticacao, restringirPorIP, async (req, res) => 
         const userId = req.session.userId;
         const hoje = new Date();
         hoje.setHours(0, 0, 0, 0);
-
-        const registrosDoDia = await RegistroPonto.findAll({
-            where: { UserId: userId, timestamp: { [Op.gte]: hoje } },
-            order: [['timestamp', 'ASC']]
-        });
-
-        const numeroDeRegistros = registrosDoDia.length;
+        const registrosDoDia = await RegistroPonto.findAll({ where: { UserId: userId, timestamp: { [Op.gte]: hoje } }, order: [['timestamp', 'ASC']] });
         let tipoDeBatida = '';
-
-        if (numeroDeRegistros === 0) tipoDeBatida = 'Entrada';
-        else if (numeroDeRegistros === 1) tipoDeBatida = 'Saida Almoço';
-        else if (numeroDeRegistros === 2) tipoDeBatida = 'Volta Almoço';
-        else if (numeroDeRegistros === 3) tipoDeBatida = 'Saida';
-        else return res.redirect('/dashboard?mensagem=ciclo_finalizado');
-
+        switch (registrosDoDia.length) {
+            case 0: tipoDeBatida = 'Entrada'; break;
+            case 1: tipoDeBatida = 'Saida Almoço'; break;
+            case 2: tipoDeBatida = 'Volta Almoço'; break;
+            case 3: tipoDeBatida = 'Saida'; break;
+            default: return res.redirect('/dashboard?mensagem=ciclo_finalizado');
+        }
         await RegistroPonto.create({ UserId: userId, tipo: tipoDeBatida });
         res.redirect('/dashboard');
     } catch (error) {
@@ -298,48 +283,31 @@ app.post('/registrar', checarAutenticacao, restringirPorIP, async (req, res) => 
     }
 });
 
-// --- Rotas do RH ---
+// --- Rotas do RH (Multi-Tenant) ---
 app.get('/rh/dashboard', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
-        const todosUsuarios = await User.findAll({ where: { role: 'funcionario' } });
+        const { empresaId } = req.session;
+        const todosUsuarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId }, order: [['nome', 'ASC']] });
         const hoje = new Date();
         const inicioDoDia = new Date();
         inicioDoDia.setHours(0, 0, 0, 0);
-
-        const registrosDeHoje = await RegistroPonto.findAll({ where: { timestamp: { [Op.gte]: inicioDoDia } }, include: User, order: [['UserId', 'ASC'], ['timestamp', 'ASC']] });
-        const todasFerias = await Ferias.findAll({ order: [['dataInicio', 'DESC']] });
-
-        const configAlmoco = await Configuracao.findOne({ where: { chave: 'duracao_almoco_minutos' } });
+        const idsDosFuncionarios = todosUsuarios.map(u => u.id);
+        const [registrosDeHoje, todasFerias, configAlmoco] = await Promise.all([
+            RegistroPonto.findAll({ where: { timestamp: { [Op.gte]: inicioDoDia }, UserId: idsDosFuncionarios }, include: User, order: [['UserId', 'ASC'], ['timestamp', 'ASC']] }),
+            Ferias.findAll({ where: { UserId: idsDosFuncionarios }, order: [['dataInicio', 'DESC']] }),
+            Configuracao.findOne({ where: { chave: 'duracao_almoco_minutos', EmpresaId: empresaId } })
+        ]);
         const duracaoAlmocoAtual = configAlmoco ? configAlmoco.valor : '60';
-
         const registrosPorUsuario = {};
-        registrosDeHoje.forEach(registro => {
-            if (!registrosPorUsuario[registro.UserId]) { registrosPorUsuario[registro.UserId] = []; }
-            registrosPorUsuario[registro.UserId].push(registro);
-        });
-
+        registrosDeHoje.forEach(r => { (registrosPorUsuario[r.UserId] = registrosPorUsuario[r.UserId] || []).push(r); });
         const feriasPorUsuario = {};
-        todasFerias.forEach(ferias => {
-            if (!feriasPorUsuario[ferias.UserId]) { feriasPorUsuario[ferias.UserId] = []; }
-            feriasPorUsuario[ferias.UserId].push(ferias);
+        todasFerias.forEach(f => { (feriasPorUsuario[f.UserId] = feriasPorUsuario[f.UserId] || []).push(f); });
+        const horasPorUsuario = {}, expedienteDoDiaPorUsuario = {};
+        todosUsuarios.forEach(u => {
+            horasPorUsuario[u.id] = calcularHorasTrabalhadas(registrosPorUsuario[u.id]);
+            expedienteDoDiaPorUsuario[u.id] = getHorarioExpediente(u, hoje);
         });
-
-        const horasPorUsuario = {};
-        const expedienteDoDiaPorUsuario = {};
-        todosUsuarios.forEach(usuario => {
-            const registrosDoUsuario = registrosPorUsuario[usuario.id];
-            horasPorUsuario[usuario.id] = calcularHorasTrabalhadas(registrosDoUsuario);
-            expedienteDoDiaPorUsuario[usuario.id] = getHorarioExpediente(usuario, hoje);
-        });
-
-        res.render('rh_dashboard', {
-            usuarios: todosUsuarios,
-            registros: registrosPorUsuario,
-            horas: horasPorUsuario,
-            expedientes: expedienteDoDiaPorUsuario,
-            ferias: feriasPorUsuario,
-            duracaoAlmocoAtual: duracaoAlmocoAtual
-        });
+        res.render('rh_dashboard', { usuarios: todosUsuarios, registros: registrosPorUsuario, horas: horasPorUsuario, expedientes: expedienteDoDiaPorUsuario, ferias: feriasPorUsuario, duracaoAlmocoAtual });
     } catch (error) {
         console.error("Erro na dashboard do RH:", error);
         res.status(500).send('Ocorreu um erro ao carregar a página do RH.');
@@ -349,8 +317,7 @@ app.get('/rh/dashboard', checarAutenticacao, checarAutorizacaoRH, async (req, re
 app.post('/rh/definir-horario/:userId', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { horarioEntrada, horarioSaida } = req.body;
-        const userId = req.params.userId;
-        await User.update({ horarioEntrada, horarioSaida }, { where: { id: userId } });
+        await User.update({ horarioEntrada, horarioSaida }, { where: { id: req.params.userId, EmpresaId: req.session.empresaId } });
         res.redirect('/rh/dashboard');
     } catch (error) {
         console.error("Erro ao definir horário:", error);
@@ -361,14 +328,11 @@ app.post('/rh/definir-horario/:userId', checarAutenticacao, checarAutorizacaoRH,
 app.post('/rh/ferias/agendar', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { funcionarioId, dataInicio, dataFim } = req.body;
-        if (!funcionarioId || !dataInicio || !dataFim || new Date(dataFim) < new Date(dataInicio)) {
-            return res.status(400).send('Dados inválidos para agendar férias.');
+        const funcionario = await User.findOne({ where: { id: funcionarioId, EmpresaId: req.session.empresaId }});
+        if (!funcionario || !dataInicio || !dataFim || new Date(dataFim) < new Date(dataInicio)) {
+            return res.status(400).send('Dados inválidos ou funcionário não pertence à sua empresa.');
         }
-        await Ferias.create({
-            dataInicio,
-            dataFim,
-            UserId: funcionarioId
-        });
+        await Ferias.create({ dataInicio, dataFim, UserId: funcionarioId });
         res.redirect('/rh/dashboard');
     } catch (error) {
         console.error("Erro ao agendar férias:", error);
@@ -381,7 +345,8 @@ app.post('/rh/configuracoes', checarAutenticacao, checarAutorizacaoRH, async (re
         const { duracaoAlmocoMinutos } = req.body;
         await Configuracao.upsert({
             chave: 'duracao_almoco_minutos',
-            valor: duracaoAlmocoMinutos
+            valor: duracaoAlmocoMinutos,
+            EmpresaId: req.session.empresaId
         });
         res.redirect('/rh/dashboard');
     } catch (error) {
@@ -390,21 +355,28 @@ app.post('/rh/configuracoes', checarAutenticacao, checarAutorizacaoRH, async (re
     }
 });
 
+// --- ROTA DE RELATÓRIOS ATUALIZADA ---
 app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
+        const { empresaId } = req.session;
         const { dataInicio, dataFim, funcionarioId } = req.query;
         const hoje = new Date().toISOString().split('T')[0];
         const inicio = dataInicio || hoje;
         const fim = dataFim || hoje;
 
-        const listaFuncionarios = await User.findAll({ where: { role: 'funcionario' }, order: [['nome', 'ASC']] });
+        const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId }, order: [['nome', 'ASC']] });
+        
         let funcionariosParaProcessar = listaFuncionarios;
         if (funcionarioId && funcionarioId !== 'todos') {
             funcionariosParaProcessar = listaFuncionarios.filter(f => f.id == funcionarioId);
         }
+        const idsDosFuncionarios = funcionariosParaProcessar.map(u => u.id);
 
-        const registrosNoPeriodo = await RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${inicio} 00:00:00`, `${fim} 23:59:59`] } } });
-        const todasFerias = await Ferias.findAll();
+        const [registrosNoPeriodo, todasFerias] = await Promise.all([
+            RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${inicio} 00:00:00`, `${fim} 23:59:59`] }, UserId: idsDosFuncionarios } }),
+            Ferias.findAll({ where: { UserId: idsDosFuncionarios } })
+        ]);
+
         const faltas = [];
         let dataAtual = new Date(`${inicio}T12:00:00Z`);
         const dataFinal = new Date(`${fim}T12:00:00Z`);
@@ -427,9 +399,7 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
         }
 
         res.render('relatorios', {
-            faltas: faltas,
-            dataInicio: inicio,
-            dataFim: fim,
+            faltas: faltas, dataInicio: inicio, dataFim: fim,
             listaFuncionarios: listaFuncionarios,
             funcionarioIdSelecionado: funcionarioId || 'todos'
         });
@@ -439,21 +409,27 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
     }
 });
 
+// --- ROTA DE DOWNLOAD ATUALIZADA ---
 app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
+        const { empresaId } = req.session;
         const { dataInicio, dataFim, funcionarioId } = req.query;
         if (!dataInicio || !dataFim) {
             return res.status(400).send("Datas de início e fim são obrigatórias.");
         }
 
-        const listaFuncionarios = await User.findAll({ where: { role: 'funcionario' } });
+        const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId } });
         let funcionariosParaProcessar = listaFuncionarios;
         if (funcionarioId && funcionarioId !== 'todos') {
             funcionariosParaProcessar = listaFuncionarios.filter(f => f.id == funcionarioId);
         }
+        const idsDosFuncionarios = funcionariosParaProcessar.map(u => u.id);
+        
+        const [registrosNoPeriodo, todasFerias] = await Promise.all([
+            RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${dataInicio} 00:00:00`, `${dataFim} 23:59:59`] }, UserId: idsDosFuncionarios } }),
+            Ferias.findAll({ where: { UserId: idsDosFuncionarios } })
+        ]);
 
-        const registrosNoPeriodo = await RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${dataInicio} 00:00:00`, `${dataFim} 23:59:59`] } } });
-        const todasFerias = await Ferias.findAll();
         const faltas = [];
         let dataAtual = new Date(`${dataInicio}T12:00:00Z`);
         const dataFinal = new Date(`${dataFim}T12:00:00Z`);
@@ -505,25 +481,30 @@ app.get('/', (req, res) => {
 // =================================================================
 // FUNÇÕES E INICIALIZAÇÃO DO SERVIDOR
 // =================================================================
-async function criarUsuarioRH() {
+async function iniciarSistema() {
     const adminEmail = process.env.ADMIN_EMAIL || 'rh@empresa.com';
     const adminSenha = process.env.ADMIN_SENHA || 'senha123';
+    const [empresa, criada] = await Empresa.findOrCreate({
+        where: { id: 1 },
+        defaults: { nome: 'Empresa Matriz (Padrão)' }
+    });
+    if (criada) { console.log(`Empresa Padrão (ID: 1) criada.`); }
     const userExists = await User.findOne({ where: { email: adminEmail } });
-
     if (!userExists) {
         const senhaHash = await bcrypt.hash(adminSenha, 10);
         await User.create({
             nome: 'Admin RH',
             email: adminEmail,
             senha: senhaHash,
-            role: 'rh'
+            role: 'rh',
+            EmpresaId: empresa.id
         });
-        console.log('Usuário RH criado com sucesso!');
+        console.log('Usuário RH Padrão criado.');
     }
 }
 
 sequelize.sync().then(async () => {
-    await criarUsuarioRH();
+    await iniciarSistema();
     app.listen(port, () => {
         console.log(`Servidor rodando em http://localhost:${port}`);
     });

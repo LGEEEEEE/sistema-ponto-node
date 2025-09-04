@@ -16,7 +16,6 @@
             height: 100vh;
             margin: 0;
         }
-
         /* O card principal */
         .auth-container {
             background-color: #ffffff;
@@ -27,15 +26,13 @@
             max-width: 400px;
             text-align: center;
         }
-
         /* Título */
         h1 {
             color: #333;
             margin-bottom: 24px;
             font-size: 24px;
         }
-
-        /* --- ESTILO ADICIONADO PARA A MENSAGEM DE ERRO --- */
+        /* Mensagem de Erro */
         .error-message {
             background-color: #fbeae5;
             color: #c0392b;
@@ -45,8 +42,7 @@
             text-align: center;
             font-size: 14px;
         }
-
-        /* Estilo dos campos de texto */
+        /* Campos de texto */
         .input-field {
             width: 100%;
             padding: 12px 15px;
@@ -56,12 +52,10 @@
             box-sizing: border-box;
             font-size: 16px;
         }
-
         .input-field:focus {
             outline: none;
             border-color: #2980b9;
         }
-
         /* Botão principal */
         .submit-btn {
             width: 100%;
@@ -75,36 +69,35 @@
             font-weight: bold;
             transition: background-color 0.2s;
         }
-
         .submit-btn:hover {
             background-color: #3498db;
         }
-
         /* Link para a outra página */
         .switch-link {
-            margin-top: 20px;
+            margin-top: 15px;
             font-size: 14px;
         }
-
         .switch-link a {
             color: #2980b9;
             text-decoration: none;
             font-weight: 600;
         }
-
         .switch-link a:hover {
             text-decoration: underline;
+        }
+        hr { 
+            border: 0; 
+            height: 1px; 
+            background-color: #eee; 
+            margin: 20px 0; 
         }
     </style>
 </head>
 <body>
     <div class="auth-container">
-        <h1>Login no Sistema</h1>
-
+        <h1>Login do Funcionário</h1>
         <% if (locals.error) { %>
-            <div class="error-message">
-                <%= error %>
-            </div>
+            <div class="error-message"><%= error %></div>
         <% } %>
 
         <form action="/login" method="POST">
@@ -112,8 +105,14 @@
             <input class="input-field" type="password" name="senha" placeholder="Senha" required>
             <button class="submit-btn" type="submit">Entrar</button>
         </form>
+        
+        <hr>
+
         <p class="switch-link">
-            Não tem uma conta? <a href="/cadastro">Cadastre-se</a>
+            É administrador? <a href="/rh/login">Login do RH</a>
+        </p>
+        <p class="switch-link">
+            Sua empresa ainda não usa o sistema? <a href="/empresa/cadastrar">Cadastre-a aqui</a>
         </p>
     </div>
 </body>
