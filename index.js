@@ -153,20 +153,36 @@ function calcularHorasTrabalhadas(registros) {
     return `${horas.toString().padStart(2, '0')}h ${minutos.toString().padStart(2, '0')}m`;
 }
 
+// A NOVA versão da função
+// A NOVA versão da função com horário padrão
 function getHorarioExpediente(usuario, data) {
-    const horario = {
-        entrada: usuario.horarioEntrada,
-        saida: usuario.horarioSaida
+    // 1. Define o horário padrão da empresa
+    const horarioPadrao = {
+        entrada: '09:00:00',
+        saida: '18:00:00'
     };
-    if (!horario.entrada || !horario.saida) {
-        return null;
-    }
+
+    // 2. Usa o horário do funcionário, se existir. Se não, usa o padrão.
+    const horario = {
+        entrada: usuario.horarioEntrada || horarioPadrao.entrada,
+        saida: usuario.horarioSaida || horarioPadrao.saida
+    };
+
     const diaDaSemana = data.getDay(); // 5 = Sexta-feira
+
+    // 3. Aplica a regra da sexta-feira sobre o horário apurado (padrão ou customizado)
     if (diaDaSemana === 5) {
-        const [hora, minuto, segundo] = horario.saida.split(':');
-        const horaSaidaSexta = parseInt(hora, 10) - 1;
-        horario.saida = `${horaSaidaSexta.toString().padStart(2, '0')}:${minuto}:${segundo}`;
+        // Ajusta a entrada (1 hora mais cedo)
+        const [horaEntrada, minutoEntrada, segundoEntrada] = horario.entrada.split(':');
+        const horaEntradaSexta = parseInt(horaEntrada, 10) - 1;
+        horario.entrada = `${horaEntradaSexta.toString().padStart(2, '0')}:${minutoEntrada}:${segundoEntrada}`;
+
+        // Ajusta a saída (1 hora mais cedo)
+        const [horaSaida, minutoSaida, segundoSaida] = horario.saida.split(':');
+        const horaSaidaSexta = parseInt(horaSaida, 10) - 1;
+        horario.saida = `${horaSaidaSexta.toString().padStart(2, '0')}:${minutoSaida}:${segundoSaida}`;
     }
+
     return horario;
 }
 
