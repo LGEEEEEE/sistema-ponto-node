@@ -1,0 +1,14 @@
+# Arquivo .gitignore
+
+# Dependências do Node.js
+node_modules/
+
+# Arquivos de banco de dados locais
+database.sqlite
+sessions.sqlite
+
+# Arquivo de segredos e variáveis de ambiente
+.env
+
+# Logs de erro do npm
+npm-debug.log*

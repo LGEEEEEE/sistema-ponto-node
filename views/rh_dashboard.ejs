@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+    <title>Dashboard do RH</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 2em; background-color: #f9f9f9; color: #333; }
+        h1, h2 { color: #2c3e50; }
+        a { color: #3498db; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background-color: #fff; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: middle; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        tr:nth-child(even) { background-color: #f8f8f8; }
+        .registros { list-style-type: none; padding: 0; margin: 0; }
+        .registros li { padding: 2px 0; }
+        .status-atrasado { font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px; }
+        .horario-form input { width: 70px; padding: 4px; margin-right: 5px; }
+        .horario-form button { padding: 4px 8px; cursor: pointer; }
+        .horario-sexta { font-size: 0.8em; color: #27ae60; }
+        .ferias-lista { list-style-type: none; padding: 0; margin: 10px 0 0 0; font-size: 0.9em; max-height: 100px; overflow-y: auto; }
+        .ferias-lista li { background-color: #eafaf1; padding: 5px; border-radius: 3px; margin-bottom: 5px;}
+        .ferias-form { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+        .ferias-form div { display: flex; gap: 5px; align-items: center;}
+        .ferias-form input { width: 125px; }
+    </style>
+</head>
+<body>
+    <h1>Dashboard do RH</h1>
+    <h2>Hoje é: <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %></h2>
+    <p>
+        <a href="/dashboard">← Voltar para minha dashboard</a> | 
+        <a href="/rh/relatorios">Ver Relatório de Faltas</a>
+    </p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Funcionário</th>
+                <th>Expediente de Hoje</th>
+                <th>Registros de Hoje</th>
+                <th>Status / Horas Trabalhadas</th>
+                <th>Definir Horário Padrão</th>
+                <th>Férias</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% usuarios.forEach(usuario => { %>
+                <tr>
+                    <td><%= usuario.nome %></td>
+                    <td>
+                        <% const expediente = expedientes[usuario.id]; %>
+                        <% if (expediente) { %>
+                            <span><%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %></span>
+                            <% if (new Date().getDay() === 5) { %>
+                                <div class="horario-sexta">(horário de sexta-feira)</div>
+                            <% } %>
+                        <% } else { %>
+                            Não definido
+                        <% } %>
+                    </td>
+                    <td>
+                        <% const registrosDoUsuario = registros[usuario.id] || []; %>
+                        <% if (registrosDoUsuario.length > 0) { %>
+                            <ul class="registros">
+                                <% registrosDoUsuario.forEach(registro => { %>
+                                    <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR') %></li>
+                                <% }) %>
+                            </ul>
+                        <% } else { %>
+                            Nenhum registro hoje.
+                        <% } %>
+                    </td>
+                    <td>
+                        <% 
+                        const registroEntrada = registrosDoUsuario.find(r => r.tipo === 'Entrada');
+                        if (registroEntrada && expediente) {
+                            const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}`);
+                            const horaEntradaReal = new Date(registroEntrada.timestamp);
+                            
+                            if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() || 
+                               (horaEntradaReal.getHours() === horaEntradaEsperada.getHours() && horaEntradaReal.getMinutes() > horaEntradaEsperada.getMinutes())) {
+                        %>
+                            <span class="status-atrasado">Atrasado</span>
+                        <% 
+                            }
+                        } 
+                        %>
+                        <div><strong>Total:</strong> <%= horas[usuario.id] %></div>
+                    </td>
+                    <td>
+                        <form class="horario-form" action="/rh/definir-horario/<%= usuario.id %>" method="POST">
+                            <input type="time" name="horarioEntrada" value="<%= usuario.horarioEntrada || '' %>" required>
+                            <input type="time" name="horarioSaida" value="<%= usuario.horarioSaida || '' %>" required>
+                            <button type="submit">Salvar</button>
+                        </form>
+                    </td>
+                    <td>
+                        <form class="ferias-form" action="/rh/ferias/agendar" method="POST">
+                            <input type="hidden" name="funcionarioId" value="<%= usuario.id %>">
+                            <div>
+                                <input type="date" name="dataInicio" required title="Data de início das férias">
+                                <span>até</span>
+                                <input type="date" name="dataFim" required title="Data de fim das férias">
+                            </div>
+                            <button type="submit">Agendar Férias</button>
+                        </form>
+                        
+                        <ul class="ferias-lista">
+                            <% const feriasDoUsuario = ferias[usuario.id] || []; %>
+                            <% if (feriasDoUsuario.length > 0) { %>
+                                <% feriasDoUsuario.forEach(f => { %>
+                                    <li>
+                                        <%= new Date(f.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR') %>
+                                        até
+                                        <%= new Date(f.dataFim + 'T12:00:00').toLocaleDateString('pt-BR') %>
+                                    </li>
+                                <% }) %>
+                            <% } else { %>
+                                <li>Nenhuma férias agendada.</li>
+                            <% } %>
+                        </ul>
+                    </td>
+                </tr>
+            <% }) %>
+            <% if (usuarios.length === 0) { %>
+                <tr>
+                    <td colspan="6" style="text-align: center;">Nenhum funcionário cadastrado.</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</body>
+</html>

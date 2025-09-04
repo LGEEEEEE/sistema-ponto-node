@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+    <title>Relatório de Faltas</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 2em; background-color: #f9f9f9; color: #333; }
+        h1 { color: #2c3e50; }
+        a { color: #3498db; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+        .filtro-box { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .filtro-box form { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
+        .filtro-box label { font-weight: bold; }
+        .filtro-box input, .filtro-box select { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .filtro-box button, .download-button { padding: 8px 15px; color: white; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-size: 14px; }
+        .filtro-box button { background-color: #2980b9; }
+        .download-button { background-color: #27ae60; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background-color: #fff; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f2f2f2; font-weight: bold; }
+        .sem-faltas { text-align: center; padding: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Relatório de Faltas</h1>
+    <p><a href="/rh/dashboard">← Voltar para a Dashboard do RH</a></p>
+
+    <div class="filtro-box">
+        <form action="/rh/relatorios" method="GET">
+            <label for="dataInicio">De:</label>
+            <input type="date" id="dataInicio" name="dataInicio" value="<%= dataInicio %>" required>
+            
+            <label for="dataFim">Até:</label>
+            <input type="date" id="dataFim" name="dataFim" value="<%= dataFim %>" required>
+
+            <label for="funcionarioId">Funcionário:</label>
+            <select name="funcionarioId" id="funcionarioId">
+                <option value="todos">Todos os Funcionários</option>
+                <% listaFuncionarios.forEach(func => { %>
+                    <option value="<%= func.id %>" <%= funcionarioIdSelecionado == func.id ? 'selected' : '' %>>
+                        <%= func.nome %>
+                    </option>
+                <% }) %>
+            </select>
+            
+            <button type="submit">Filtrar</button>
+
+            <a href="/rh/relatorios/download?dataInicio=<%= dataInicio %>&dataFim=<%= dataFim %>&funcionarioId=<%= funcionarioIdSelecionado %>" class="download-button">
+                Baixar CSV
+            </a>
+        </form>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Funcionário</th>
+                <th>Data da Falta</th>
+            </tr>
+        </thead>
+        <tbody>
+            <% if (faltas.length > 0) { %>
+                <% faltas.forEach(falta => { %>
+                    <tr>
+                        <td><%= falta.nome %></td>
+                        <td><%= new Date(falta.data + 'T12:00:00').toLocaleDateString('pt-BR') %></td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
+                <tr>
+                    <td colspan="2" class="sem-faltas">Nenhuma falta registrada no período e para o filtro selecionado.</td>
+                </tr>
+            <% } %>
+        </tbody>
+    </table>
+</body>
+</html>
