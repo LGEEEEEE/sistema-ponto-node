@@ -43,7 +43,7 @@
         <ul class="registros-lista">
             <% if (registros.length > 0) { %>
                 <% registros.forEach(registro => { %>
-                    <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR') %></li>
+                    <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %></li>
                 <% }) %>
             <% } else { %>
                 <li>Nenhum registro hoje.</li>

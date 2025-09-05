@@ -85,8 +85,7 @@
                             <% if (registrosDoUsuario.length > 0) { %>
                                 <ul style="list-style-type: none; padding: 0; margin: 0;">
                                     <% registrosDoUsuario.forEach(registro => { %>
-                                        <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR') %></li>
-                                    <% }) %>
+                                        <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %></li>
                                 </ul>
                             <% } else { %>
                                 Nenhum registro hoje.
