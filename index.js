@@ -6,9 +6,10 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
 const bcrypt = require('bcryptjs');
 const { Sequelize, DataTypes, Op } = require('sequelize');
+const pg = require('pg');
+const PgStore = require('connect-pg-simple')(session);
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -31,8 +32,7 @@ if (process.env.NODE_ENV === 'production') {
 } else {
     sequelize = new Sequelize({
         dialect: 'sqlite',
-        storage: './database.sqlite',
-        timezone: '-03:00'
+        storage: './database.sqlite'
     });
 }
 
@@ -80,13 +80,23 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', true);
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
+
+// --- CONFIGURAÇÃO DA SESSÃO COM POSTGRESQL ---
+const pool = new pg.Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
 
 app.use(session({
-    store: new SQLiteStore({ db: 'sessions.sqlite', concurrentDB: true }),
+    store: new PgStore({
+        pool: pool,
+        tableName: 'session'
+    }),
     secret: 'um-segredo-muito-forte-para-proteger-as-sessoes',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 }
+    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 dias
 }));
 
 
@@ -211,7 +221,9 @@ app.post('/cadastro', checarAutenticacao, checarAutorizacaoRH, async (req, res) 
     }
 });
 
-app.get('/login', (req, res) => { res.render('login'); });
+app.get('/login', (req, res) => {
+    res.render('login');
+});
 
 app.post('/login', async (req, res) => {
     const { email, senha } = req.body;
@@ -235,7 +247,9 @@ app.post('/logout', (req, res) => {
 });
 
 // --- Rotas de Autenticação do RH ---
-app.get('/rh/login', (req, res) => { res.render('rh_login'); });
+app.get('/rh/login', (req, res) => {
+    res.render('rh_login');
+});
 
 app.post('/rh/login', async (req, res) => {
     const { email, senha } = req.body;
@@ -357,7 +371,6 @@ app.post('/rh/configuracoes', checarAutenticacao, checarAutorizacaoRH, async (re
     }
 });
 
-// --- ROTA DE RELATÓRIOS ATUALIZADA ---
 app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { empresaId } = req.session;
@@ -365,24 +378,19 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
         const hoje = new Date().toISOString().split('T')[0];
         const inicio = dataInicio || hoje;
         const fim = dataFim || hoje;
-
         const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId }, order: [['nome', 'ASC']] });
-        
         let funcionariosParaProcessar = listaFuncionarios;
         if (funcionarioId && funcionarioId !== 'todos') {
             funcionariosParaProcessar = listaFuncionarios.filter(f => f.id == funcionarioId);
         }
         const idsDosFuncionarios = funcionariosParaProcessar.map(u => u.id);
-
         const [registrosNoPeriodo, todasFerias] = await Promise.all([
             RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${inicio} 00:00:00`, `${fim} 23:59:59`] }, UserId: idsDosFuncionarios } }),
             Ferias.findAll({ where: { UserId: idsDosFuncionarios } })
         ]);
-
         const faltas = [];
         let dataAtual = new Date(`${inicio}T12:00:00Z`);
         const dataFinal = new Date(`${fim}T12:00:00Z`);
-
         while (dataAtual <= dataFinal) {
             const diaDaSemana = dataAtual.getUTCDay();
             if (diaDaSemana !== 0 && diaDaSemana !== 6) {
@@ -390,7 +398,6 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
                 for (const funcionario of funcionariosParaProcessar) {
                     const estaDeFerias = todasFerias.some(f => f.UserId === funcionario.id && new Date(dataFormatada) >= new Date(f.dataInicio) && new Date(dataFormatada) <= new Date(f.dataFim));
                     if (estaDeFerias) continue;
-
                     const temRegistro = registrosNoPeriodo.some(r => r.UserId === funcionario.id && new Date(r.timestamp).toISOString().split('T')[0] === dataFormatada);
                     if (!temRegistro) {
                         faltas.push({ nome: funcionario.nome, data: dataFormatada });
@@ -399,7 +406,6 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
             }
             dataAtual.setUTCDate(dataAtual.getUTCDate() + 1);
         }
-
         res.render('relatorios', {
             faltas: faltas, dataInicio: inicio, dataFim: fim,
             listaFuncionarios: listaFuncionarios,
@@ -411,7 +417,6 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
     }
 });
 
-// --- ROTA DE DOWNLOAD ATUALIZADA ---
 app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { empresaId } = req.session;
@@ -419,23 +424,19 @@ app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, asyn
         if (!dataInicio || !dataFim) {
             return res.status(400).send("Datas de início e fim são obrigatórias.");
         }
-
         const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId } });
         let funcionariosParaProcessar = listaFuncionarios;
         if (funcionarioId && funcionarioId !== 'todos') {
             funcionariosParaProcessar = listaFuncionarios.filter(f => f.id == funcionarioId);
         }
         const idsDosFuncionarios = funcionariosParaProcessar.map(u => u.id);
-        
         const [registrosNoPeriodo, todasFerias] = await Promise.all([
             RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${dataInicio} 00:00:00`, `${dataFim} 23:59:59`] }, UserId: idsDosFuncionarios } }),
             Ferias.findAll({ where: { UserId: idsDosFuncionarios } })
         ]);
-
         const faltas = [];
         let dataAtual = new Date(`${dataInicio}T12:00:00Z`);
-        const dataFinal = new Date(`${dataFim}T12:00:00Z`);
-
+        const dataFinal = new Date(`${fim}T12:00:00Z`);
         while (dataAtual <= dataFinal) {
             const diaDaSemana = dataAtual.getUTCDay();
             if (diaDaSemana !== 0 && diaDaSemana !== 6) {
@@ -443,7 +444,6 @@ app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, asyn
                 for (const funcionario of funcionariosParaProcessar) {
                     const estaDeFerias = todasFerias.some(f => f.UserId === funcionario.id && new Date(dataFormatada) >= new Date(f.dataInicio) && new Date(dataFormatada) <= new Date(f.dataFim));
                     if (estaDeFerias) continue;
-
                     const temRegistro = registrosNoPeriodo.some(r => r.UserId === funcionario.id && new Date(r.timestamp).toISOString().split('T')[0] === dataFormatada);
                     if (!temRegistro) {
                         faltas.push({
@@ -455,11 +455,9 @@ app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, asyn
             }
             dataAtual.setUTCDate(dataAtual.getUTCDate() + 1);
         }
-
         const csvHeader = 'Funcionario,Data da Falta\n';
         const csvRows = faltas.map(f => `${f.nome},${f.data}`).join('\n');
         const csvContent = csvHeader + csvRows;
-
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');
         res.setHeader('Content-Disposition', `attachment; filename="relatorio_faltas_${dataInicio}_a_${dataFim}.csv"`);
         res.status(200).send(csvContent);
@@ -468,7 +466,6 @@ app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, asyn
         res.status(500).send('Ocorreu um erro ao gerar o arquivo.');
     }
 });
-
 
 // Rota Raiz
 app.get('/', (req, res) => {
@@ -483,23 +480,13 @@ app.get('/', (req, res) => {
 // =================================================================
 // FUNÇÕES E INICIALIZAÇÃO DO SERVIDOR
 // =================================================================
-// =================================================================
-// FUNÇÕES E INICIALIZAÇÃO DO SERVIDOR
-// =================================================================
 async function iniciarSistema() {
     const adminEmail = process.env.ADMIN_EMAIL || 'rh@empresa.com';
     const adminSenha = process.env.ADMIN_SENHA || 'senha123';
-
-    // --- CORREÇÃO APLICADA AQUI ---
     const [empresa, criada] = await Empresa.findOrCreate({
-        where: { nome: 'Empresa Matriz (Padrão)' },
-        defaults: { nome: 'Empresa Matriz (Padrão)' }
+        where: { nome: 'Empresa Matriz (Padrão)' }
     });
-
-    if (criada) { 
-        console.log(`Empresa Padrão (ID: ${empresa.id}) criada.`); 
-    }
-
+    if (criada) { console.log(`Empresa Padrão (ID: ${empresa.id}) criada.`); }
     const userExists = await User.findOne({ where: { email: adminEmail } });
     if (!userExists) {
         const senhaHash = await bcrypt.hash(adminSenha, 10);
