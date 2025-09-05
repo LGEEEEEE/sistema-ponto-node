@@ -61,93 +61,92 @@
             </tr>
         </thead>
         <tbody>
-        <% if (usuarios.length > 0) { %>
-            <% usuarios.forEach(usuario => { %>
-                <tr>
-                    <td><%= usuario.nome %></td>
-                    
-                    <td>
-                        <% const expediente = expedientes[usuario.id]; %>
-                        <% if (expediente) { %>
-                            <span><%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %></span>
-                            <% if (new Date().getDay() === 5) { %>
-                                <div style="font-size: 0.8em; color: #27ae60;">(horário de sexta-feira)</div>
-                            <% } %>
-                        <% } else { %>
-                            Não definido
-                        <% } %>
-                    </td>
-                    
-                    <td>
-                        <% const registrosDoUsuario = registros[usuario.id] || []; %>
-                        <% if (registrosDoUsuario.length > 0) { %>
-                            <ul style="list-style-type: none; padding: 0; margin: 0;">
-                                <% registrosDoUsuario.forEach(registro => { %>
-                                    <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR') %></li>
-                                <% }) %>
-                            </ul>
-                        <% } else { %>
-                            Nenhum registro hoje.
-                        <% } %>
-                    </td>
-                    
-                    <td>
-                        <% 
-                        const registroEntrada = registrosDoUsuario.find(r => r.tipo === 'Entrada');
-                        if (registroEntrada && expediente) {
-                            const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}`);
-                            const horaEntradaReal = new Date(registroEntrada.timestamp);
-                            if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() || (horaEntradaReal.getHours() === horaEntradaEsperada.getHours() && horaEntradaReal.getMinutes() > horaEntradaEsperada.getMinutes())) {
-                        %>
-                            <span style="font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">Atrasado</span>
-                        <% 
-                            }
-                        } 
-                        %>
-                        <div><strong>Total:</strong> <%= horas[usuario.id] %></div>
-                    </td>
-
-                    <td>
-                        <form action="/rh/definir-horario/<%= usuario.id %>" method="POST" style="display: flex; gap: 5px; align-items: center;">
-                            <input type="time" name="horarioEntrada" value="<%= usuario.horarioEntrada || '' %>" required>
-                            <input type="time" name="horarioSaida" value="<%= usuario.horarioSaida || '' %>" required>
-                            <button type="submit">Salvar</button>
-                        </form>
-                    </td>
-
-                    <td>
-                        <form action="/rh/ferias/agendar" method="POST" style="display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
-                            <input type="hidden" name="funcionarioId" value="<%= usuario.id %>">
-                            <div style="display: flex; gap: 5px; align-items: center;">
-                                <input type="date" name="dataInicio" required title="Data de início das férias">
-                                <span>até</span>
-                                <input type="date" name="dataFim" required title="Data de fim das férias">
-                            </div>
-                            <button type="submit">Agendar Férias</button>
-                        </form>
-                        <ul style="list-style-type: none; padding: 0; margin: 10px 0 0 0; font-size: 0.9em; max-height: 100px; overflow-y: auto;">
-                            <% const feriasDoUsuario = ferias[usuario.id] || []; %>
-                            <% if (feriasDoUsuario.length > 0) { %>
-                                <% feriasDoUsuario.forEach(f => { %>
-                                    <li style="background-color: #eafaf1; padding: 5px; border-radius: 3px; margin-bottom: 5px;">
-                                        <%= new Date(f.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR') %>
-                                        até
-                                        <%= new Date(f.dataFim + 'T12:00:00').toLocaleDateString('pt-BR') %>
-                                    </li>
-                                <% }) %>
+            <% if (usuarios.length > 0) { %>
+                <% usuarios.forEach(usuario => { %>
+                    <tr>
+                        <td>
+                            <strong><%= usuario.nome %></strong>
+                            <br>
+                            <small style="color: #555;"><%= usuario.email %></small>
+                        </td>
+                        <td>
+                            <% const expediente = expedientes[usuario.id]; %>
+                            <% if (expediente) { %>
+                                <span><%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %></span>
+                                <% if (new Date().getDay() === 5) { %>
+                                    <div style="font-size: 0.8em; color: #27ae60;">(horário de sexta-feira)</div>
+                                <% } %>
                             <% } else { %>
-                                <li>Nenhuma férias agendada.</li>
+                                Não definido
                             <% } %>
-                        </ul>
-                    </td>
+                        </td>
+                        <td>
+                            <% const registrosDoUsuario = registros[usuario.id] || []; %>
+                            <% if (registrosDoUsuario.length > 0) { %>
+                                <ul style="list-style-type: none; padding: 0; margin: 0;">
+                                    <% registrosDoUsuario.forEach(registro => { %>
+                                        <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR') %></li>
+                                    <% }) %>
+                                </ul>
+                            <% } else { %>
+                                Nenhum registro hoje.
+                            <% } %>
+                        </td>
+                        <td>
+                            <% 
+                            const registroEntrada = registrosDoUsuario.find(r => r.tipo === 'Entrada');
+                            if (registroEntrada && expediente) {
+                                const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}`);
+                                const horaEntradaReal = new Date(registroEntrada.timestamp);
+                                if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() || (horaEntradaReal.getHours() === horaEntradaEsperada.getHours() && horaEntradaReal.getMinutes() > horaEntradaEsperada.getMinutes())) {
+                            %>
+                                <span style="font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">Atrasado</span>
+                            <% 
+                                }
+                            } 
+                            %>
+                            <div><strong>Total:</strong> <%= horas[usuario.id] %></div>
+                        </td>
+                        <td>
+                            <form action="/rh/definir-horario/<%= usuario.id %>" method="POST" style="display: flex; gap: 5px; align-items: center;">
+                                <input type="time" name="horarioEntrada" value="<%= usuario.horarioEntrada || '' %>" required>
+                                <input type="time" name="horarioSaida" value="<%= usuario.horarioSaida || '' %>" required>
+                                <button type="submit">Salvar</button>
+                            </form>
+                        </td>
+                        <td>
+                            <form action="/rh/ferias/agendar" method="POST" style="display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
+                                <input type="hidden" name="funcionarioId" value="<%= usuario.id %>">
+                                <div style="display: flex; gap: 5px; align-items: center;">
+                                    <input type="date" name="dataInicio" required title="Data de início das férias">
+                                    <span>até</span>
+                                    <input type="date" name="dataFim" required title="Data de fim das férias">
+                                </div>
+                                <button type="submit">Agendar Férias</button>
+                            </form>
+                            <ul class="ferias-lista">
+                                <% const feriasDoUsuario = ferias[usuario.id] || []; %>
+                                <% if (feriasDoUsuario.length > 0) { %>
+                                    <% feriasDoUsuario.forEach(f => { %>
+                                        <li>
+                                            <%= new Date(f.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR') %>
+                                            até
+                                            <%= new Date(f.dataFim + 'T12:00:00').toLocaleDateString('pt-BR') %>
+                                        </li>
+                                    <% }) %>
+                                <% } else { %>
+                                    <li>Nenhuma férias agendada.</li>
+                                <% } %>
+                            </ul>
+                        </td>
+                    </tr>
+                <% }) %>
+            <% } else { %>
+                <tr>
+                    <td colspan="6" style="text-align: center;">Nenhum funcionário cadastrado.</td>
                 </tr>
-            <% }) %>
-        <% } else { %>
-            <tr>
-                <td colspan="6" style="text-align: center;">Nenhum funcionário cadastrado.</td>
-            </tr>
-        <% } %>
-    </tbody>
+            <% } %>
+        </tbody>
     </table>
 </body>
 </html>
