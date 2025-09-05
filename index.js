@@ -25,12 +25,14 @@ if (process.env.NODE_ENV === 'production') {
         protocol: 'postgres',
         dialectOptions: {
             ssl: { require: true, rejectUnauthorized: false }
-        }
+        },
+        timezone: '-03:00'
     });
 } else {
     sequelize = new Sequelize({
         dialect: 'sqlite',
-        storage: './database.sqlite'
+        storage: './database.sqlite',
+        timezone: '-03:00'
     });
 }
 
