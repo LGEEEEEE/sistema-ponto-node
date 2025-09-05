@@ -82,7 +82,7 @@ app.set('trust proxy', true);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// --- CONFIGURAÇÃO DA SESSÃO COM POSTGRESQL ---
+// Configuração da Sessão com PostgreSQL
 const pool = new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
@@ -431,7 +431,7 @@ app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, asyn
         }
         const idsDosFuncionarios = funcionariosParaProcessar.map(u => u.id);
         const [registrosNoPeriodo, todasFerias] = await Promise.all([
-            RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${dataInicio} 00:00:00`, `${dataFim} 23:59:59`] }, UserId: idsDosFuncionarios } }),
+            RegistroPonto.findAll({ where: { timestamp: { [Op.between]: [`${dataInicio} 00:00:00`, `${fim} 23:59:59`] }, UserId: idsDosFuncionarios } }),
             Ferias.findAll({ where: { UserId: idsDosFuncionarios } })
         ]);
         const faltas = [];
@@ -484,7 +484,8 @@ async function iniciarSistema() {
     const adminEmail = process.env.ADMIN_EMAIL || 'rh@empresa.com';
     const adminSenha = process.env.ADMIN_SENHA || 'senha123';
     const [empresa, criada] = await Empresa.findOrCreate({
-        where: { nome: 'Empresa Matriz (Padrão)' }
+        where: { nome: 'Empresa Matriz (Padrão)' },
+        defaults: { nome: 'Empresa Matriz (Padrão)' }
     });
     if (criada) { console.log(`Empresa Padrão (ID: ${empresa.id}) criada.`); }
     const userExists = await User.findOne({ where: { email: adminEmail } });
@@ -501,8 +502,40 @@ async function iniciarSistema() {
     }
 }
 
+// --- FUNÇÃO ADICIONADA ---
+// Cria a tabela de sessão se ela não existir
+async function criarTabelaDeSessaoSeNaoExistir() {
+    const query = `
+    CREATE TABLE IF NOT EXISTS "session" (
+      "sid" varchar NOT NULL COLLATE "default",
+      "sess" json NOT NULL,
+      "expire" timestamp(6) NOT NULL
+    )
+    WITH (OIDS=FALSE);
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'session_pkey'
+        ) THEN
+            ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid");
+        END IF;
+    END;
+    $$;
+    CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+    `;
+    try {
+        await sequelize.query(query);
+        console.log('Tabela de sessão verificada/criada com sucesso.');
+    } catch (error) {
+        console.error('Erro ao criar tabela de sessão:', error);
+    }
+}
+
+// --- BLOCO DE INICIALIZAÇÃO ATUALIZADO ---
 sequelize.sync().then(async () => {
     await iniciarSistema();
+    await criarTabelaDeSessaoSeNaoExistir(); // <-- CHAMADA ADICIONADA
     app.listen(port, () => {
         console.log(`Servidor rodando em http://localhost:${port}`);
     });
