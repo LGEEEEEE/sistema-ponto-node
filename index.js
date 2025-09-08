@@ -313,6 +313,27 @@ app.post('/registrar', checarAutenticacao, restringirPorIP, async (req, res) => 
 
 // --- Rotas do RH (Multi-Tenant) ---
 
+// ROTA PARA EXCLUIR FUNCIONÁRIO
+app.post('/rh/funcionario/excluir/:id', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
+    try {
+        const { empresaId } = req.session;
+        const funcionarioId = req.params.id;
+
+        await User.destroy({
+            where: {
+                id: funcionarioId,
+                EmpresaId: empresaId,
+                role: 'funcionario'
+            }
+        });
+
+        res.redirect('/rh/dashboard');
+    } catch (error) {
+        console.error("Erro ao excluir funcionário:", error);
+        res.status(500).send('Ocorreu um erro ao tentar excluir o funcionário.');
+    }
+});
+
 // index.js -> Adicione estas duas rotas
 
 // ROTA PARA MOSTRAR A PÁGINA DE EDIÇÃO

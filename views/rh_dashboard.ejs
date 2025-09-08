@@ -1,30 +1,141 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard do RH</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 2em; background-color: #f9f9f9; color: #333; }
-        h1, h2 { color: #2c3e50; }
-        a { color: #3498db; text-decoration: none; }
-        a:hover { text-decoration: underline; }
-        .header-nav { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 1em; }
-        .header-nav .actions a { margin-left: 15px; }
-        .btn-add { background-color: #27ae60; color: white; padding: 10px 18px; border-radius: 5px; font-size: 14px; font-weight: bold; }
-        .btn-add:hover { background-color: #2ecc71; }
-        .config-box { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        .config-form { display: flex; align-items: center; gap: 10px; }
-        .config-form input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 80px; }
-        .config-form button { padding: 8px 15px; cursor: pointer; background-color: #34495e; color: white; border: none; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); background-color: #fff; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; vertical-align: middle; }
-        th { background-color: #f2f2f2; font-weight: bold; }
-        .ferias-lista { list-style-type: none; padding: 0; margin: 10px 0 0 0; font-size: 0.9em; max-height: 100px; overflow-y: auto; }
-        .ferias-lista li { background-color: #eafaf1; padding: 5px; border-radius: 3px; margin-bottom: 5px;}
-        .ferias-form { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
-        .ferias-form div { display: flex; gap: 5px; align-items: center;}
-        .ferias-form input { width: 125px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 2em;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+
+        h1,
+        h2 {
+            color: #2c3e50;
+        }
+
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+
+        .header-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 1em;
+        }
+
+        .header-nav .actions a {
+            margin-left: 15px;
+        }
+
+        .btn-add {
+            background-color: #27ae60;
+            color: white;
+            padding: 10px 18px;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .btn-add:hover {
+            background-color: #2ecc71;
+        }
+
+        .config-box {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .config-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .config-form input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            width: 80px;
+        }
+
+        .config-form button {
+            padding: 8px 15px;
+            cursor: pointer;
+            background-color: #34495e;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            background-color: #fff;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+
+        .ferias-lista {
+            list-style-type: none;
+            padding: 0;
+            margin: 10px 0 0 0;
+            font-size: 0.9em;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .ferias-lista li {
+            background-color: #eafaf1;
+            padding: 5px;
+            border-radius: 3px;
+            margin-bottom: 5px;
+        }
+
+        .ferias-form {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            align-items: flex-start;
+        }
+
+        .ferias-form div {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .ferias-form input {
+            width: 125px;
+        }
+
         /* --- ESTILO ADICIONADO PARA O BOTÃO EDITAR --- */
         .btn-edit {
             background-color: #f39c12;
@@ -35,16 +146,34 @@
             text-align: center;
             display: inline-block;
         }
+
         .btn-edit:hover {
             background-color: #e67e22;
         }
+
+        .btn-delete {
+            background-color: #e74c3c;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-delete:hover {
+            background-color: #c0392b;
+        }
     </style>
 </head>
+
 <body>
     <div class="header-nav">
         <div>
             <h1>Dashboard do RH</h1>
-            <h2>Hoje é: <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long' , year: 'numeric' , month: 'long' , day: 'numeric' }) %></h2>
+            <h2>Hoje é: <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long' , year: 'numeric' , month: 'long' ,
+                    day: 'numeric' }) %>
+            </h2>
         </div>
         <div class="actions">
             <a href="/cadastro" class="btn-add">Adicionar Funcionário</a>
@@ -52,12 +181,13 @@
     </div>
 
     <p><a href="/dashboard">← Voltar para minha dashboard</a> | <a href="/rh/relatorios">Ver Relatório de Faltas</a></p>
-    
+
     <div class="config-box">
         <h2>Configurações Gerais</h2>
         <form action="/rh/configuracoes" method="POST" class="config-form">
             <label for="duracaoAlmocoMinutos">Duração Padrão do Almoço (em minutos):</label>
-            <input type="number" name="duracaoAlmocoMinutos" id="duracaoAlmocoMinutos" value="<%= duracaoAlmocoAtual %>" min="0" required>
+            <input type="number" name="duracaoAlmocoMinutos" id="duracaoAlmocoMinutos" value="<%= duracaoAlmocoAtual %>"
+                min="0" required>
             <button type="submit">Salvar Configuração</button>
         </form>
     </div>
@@ -71,60 +201,81 @@
                 <th>Status / Horas Trabalhadas</th>
                 <th>Definir Horário Padrão</th>
                 <th>Férias</th>
-                <th>Ações</th> </tr>
+                <th>Ações</th>
+            </tr>
         </thead>
         <tbody>
-            <% if (usuarios.length > 0) { %>
-                <% usuarios.forEach(usuario => { %>
+            <% if (usuarios.length> 0) { %>
+                <% usuarios.forEach(usuario=> { %>
                     <tr>
                         <td>
-                            <strong><%= usuario.nome %></strong>
+                            <strong>
+                                <%= usuario.nome %>
+                            </strong>
                             <br>
-                            <small style="color: #555;"><%= usuario.email %></small>
+                            <small style="color: #555;">
+                                <%= usuario.email %>
+                            </small>
                         </td>
                         <td>
                             <% const expediente=expedientes[usuario.id]; %>
-                            <% if (expediente) { %>
-                                <span><%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %></span>
-                                <% if (new Date().getDay()===5) { %>
-                                    <div style="font-size: 0.8em; color: #27ae60;">(horário de sexta-feira)</div>
-                                <% } %>
-                            <% } else { %>
-                                Não definido
-                            <% } %>
+                                <% if (expediente) { %>
+                                    <span>
+                                        <%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %>
+                                    </span>
+                                    <% if (new Date().getDay()===5) { %>
+                                        <div style="font-size: 0.8em; color: #27ae60;">(horário de sexta-feira)</div>
+                                        <% } %>
+                                            <% } else { %>
+                                                Não definido
+                                                <% } %>
                         </td>
                         <td>
                             <% const registrosDoUsuario=registros[usuario.id] || []; %>
-                            <% if (registrosDoUsuario.length > 0) { %>
-                                <ul style="list-style-type: none; padding: 0; margin: 0;">
-                                    <% registrosDoUsuario.forEach(registro => { %>
-                                        <li><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %></li>
-                                    <% }) %>
-                                </ul>
-                            <% } else { %>
-                                Nenhum registro hoje.
-                            <% } %>
+                                <% if (registrosDoUsuario.length> 0) { %>
+                                    <ul style="list-style-type: none; padding: 0; margin: 0;">
+                                        <% registrosDoUsuario.forEach(registro=> { %>
+                                            <li><strong>
+                                                    <%= registro.tipo %>:
+                                                </strong>
+                                                <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', {
+                                                    timeZone: 'America/Sao_Paulo' }) %>
+                                            </li>
+                                            <% }) %>
+                                    </ul>
+                                    <% } else { %>
+                                        Nenhum registro hoje.
+                                        <% } %>
                         </td>
                         <td>
-                            <% const registroEntrada=registrosDoUsuario.find(r => r.tipo === 'Entrada');
+                            <% const registroEntrada=registrosDoUsuario.find(r=> r.tipo === 'Entrada');
                                 if (registroEntrada && expediente) {
                                 const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}`);
                                 const horaEntradaReal = new Date(registroEntrada.timestamp);
-                                if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() || (horaEntradaReal.getHours() === horaEntradaEsperada.getHours() && horaEntradaReal.getMinutes() > horaEntradaEsperada.getMinutes())) {
-                            %>
-                            <span style="font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">Atrasado</span>
-                            <% } } %>
-                            <div><strong>Total:</strong> <%= horas[usuario.id] %></div>
+                                if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() ||
+                                (horaEntradaReal.getHours() === horaEntradaEsperada.getHours() &&
+                                horaEntradaReal.getMinutes() > horaEntradaEsperada.getMinutes())) {
+                                %>
+                                <span
+                                    style="font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">Atrasado</span>
+                                <% } } %>
+                                    <div><strong>Total:</strong>
+                                        <%= horas[usuario.id] %>
+                                    </div>
                         </td>
                         <td>
-                            <form action="/rh/definir-horario/<%= usuario.id %>" method="POST" style="display: flex; gap: 5px; align-items: center;">
-                                <input type="time" name="horarioEntrada" value="<%= usuario.horarioEntrada || '' %>" required>
-                                <input type="time" name="horarioSaida" value="<%= usuario.horarioSaida || '' %>" required>
+                            <form action="/rh/definir-horario/<%= usuario.id %>" method="POST"
+                                style="display: flex; gap: 5px; align-items: center;">
+                                <input type="time" name="horarioEntrada" value="<%= usuario.horarioEntrada || '' %>"
+                                    required>
+                                <input type="time" name="horarioSaida" value="<%= usuario.horarioSaida || '' %>"
+                                    required>
                                 <button type="submit">Salvar</button>
                             </form>
                         </td>
                         <td>
-                            <form action="/rh/ferias/agendar" method="POST" style="display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
+                            <form action="/rh/ferias/agendar" method="POST"
+                                style="display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
                                 <input type="hidden" name="funcionarioId" value="<%= usuario.id %>">
                                 <div style="display: flex; gap: 5px; align-items: center;">
                                     <input type="date" name="dataInicio" required title="Data de início das férias">
@@ -135,30 +286,40 @@
                             </form>
                             <ul class="ferias-lista">
                                 <% const feriasDoUsuario=ferias[usuario.id] || []; %>
-                                <% if (feriasDoUsuario.length > 0) { %>
-                                    <% feriasDoUsuario.forEach(f => { %>
-                                        <li>
-                                            <%= new Date(f.dataInicio + 'T12:00:00').toLocaleDateString('pt-BR') %>
-                                            até
-                                            <%= new Date(f.dataFim + 'T12:00:00').toLocaleDateString('pt-BR') %>
-                                        </li>
-                                    <% }) %>
-                                <% } else { %>
-                                    <li>Nenhuma férias agendada.</li>
-                                <% } %>
+                                    <% if (feriasDoUsuario.length> 0) { %>
+                                        <% feriasDoUsuario.forEach(f=> { %>
+                                            <li>
+                                                <%= new Date(f.dataInicio + 'T12:00:00' ).toLocaleDateString('pt-BR') %>
+                                                    até
+                                                    <%= new Date(f.dataFim + 'T12:00:00' ).toLocaleDateString('pt-BR')
+                                                        %>
+                                            </li>
+                                            <% }) %>
+                                                <% } else { %>
+                                                    <li>Nenhuma férias agendada.</li>
+                                                    <% } %>
                             </ul>
                         </td>
                         <td>
                             <a href="/rh/funcionario/editar/<%= usuario.id %>" class="btn-edit">Editar</a>
+
+                            <form action="/rh/funcionario/excluir/<%= usuario.id %>" method="POST"
+                                style="display: inline;">
+                                <button type="submit" class="btn-delete"
+                                    onclick="return confirm('Tem certeza que deseja excluir este funcionário? Esta ação não pode ser desfeita.');">
+                                    Excluir
+                                </button>
+                            </form>
                         </td>
                     </tr>
-                <% }) %>
-            <% } else { %>
-                <tr>
-                    <td colspan="7" style="text-align: center;">Nenhum funcionário cadastrado.</td>
-                </tr>
-            <% } %>
+                    <% }) %>
+                        <% } else { %>
+                            <tr>
+                                <td colspan="7" style="text-align: center;">Nenhum funcionário cadastrado.</td>
+                            </tr>
+                            <% } %>
         </tbody>
     </table>
 </body>
+
 </html>
