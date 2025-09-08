@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Funcionário</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .edit-container { background-color: #ffffff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); width: 100%; max-width: 480px; }
+        h1 { color: #333; margin-bottom: 24px; font-size: 24px; text-align: center; }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        .form-group input { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
+        .form-group input:focus { outline: none; border-color: #2980b9; }
+        .btn-container { display: flex; gap: 10px; margin-top: 30px; }
+        .submit-btn, .cancel-btn { flex: 1; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; text-decoration: none; text-align: center; }
+        .submit-btn { background-color: #2980b9; color: white; }
+        .submit-btn:hover { background-color: #3498db; }
+        .cancel-btn { background-color: #f1f1f1; color: #333; }
+        .cancel-btn:hover { background-color: #e1e1e1; }
+    </style>
+</head>
+<body>
+    <div class="edit-container">
+        <h1>Editar Dados do Funcionário</h1>
+        <form action="/rh/funcionario/editar/<%= funcionario.id %>" method="POST">
+            <div class="form-group">
+                <label for="nome">Nome do Funcionário</label>
+                <input id="nome" type="text" name="nome" value="<%= funcionario.nome %>" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input id="email" type="email" name="email" value="<%= funcionario.email %>" required>
+            </div>
+            <div class="form-group">
+                <label for="senha">Nova Senha (opcional)</label>
+                <input id="senha" type="password" name="senha" placeholder="Deixe em branco para não alterar">
+            </div>
+            <div class="btn-container">
+                <a href="/rh/dashboard" class="cancel-btn">Cancelar</a>
+                <button class="submit-btn" type="submit">Salvar Alterações</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

@@ -25,13 +25,26 @@
         .ferias-form { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
         .ferias-form div { display: flex; gap: 5px; align-items: center;}
         .ferias-form input { width: 125px; }
+        /* --- ESTILO ADICIONADO PARA O BOTÃO EDITAR --- */
+        .btn-edit {
+            background-color: #f39c12;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            text-align: center;
+            display: inline-block;
+        }
+        .btn-edit:hover {
+            background-color: #e67e22;
+        }
     </style>
 </head>
 <body>
     <div class="header-nav">
         <div>
             <h1>Dashboard do RH</h1>
-            <h2>Hoje é: <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) %></h2>
+            <h2>Hoje é: <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long' , year: 'numeric' , month: 'long' , day: 'numeric' }) %></h2>
         </div>
         <div class="actions">
             <a href="/cadastro" class="btn-add">Adicionar Funcionário</a>
@@ -58,7 +71,7 @@
                 <th>Status / Horas Trabalhadas</th>
                 <th>Definir Horário Padrão</th>
                 <th>Férias</th>
-            </tr>
+                <th>Ações</th> </tr>
         </thead>
         <tbody>
             <% if (usuarios.length > 0) { %>
@@ -70,10 +83,10 @@
                             <small style="color: #555;"><%= usuario.email %></small>
                         </td>
                         <td>
-                            <% const expediente = expedientes[usuario.id]; %>
+                            <% const expediente=expedientes[usuario.id]; %>
                             <% if (expediente) { %>
                                 <span><%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %></span>
-                                <% if (new Date().getDay() === 5) { %>
+                                <% if (new Date().getDay()===5) { %>
                                     <div style="font-size: 0.8em; color: #27ae60;">(horário de sexta-feira)</div>
                                 <% } %>
                             <% } else { %>
@@ -81,7 +94,7 @@
                             <% } %>
                         </td>
                         <td>
-                            <% const registrosDoUsuario = registros[usuario.id] || []; %>
+                            <% const registrosDoUsuario=registros[usuario.id] || []; %>
                             <% if (registrosDoUsuario.length > 0) { %>
                                 <ul style="list-style-type: none; padding: 0; margin: 0;">
                                     <% registrosDoUsuario.forEach(registro => { %>
@@ -93,18 +106,14 @@
                             <% } %>
                         </td>
                         <td>
-                            <% 
-                            const registroEntrada = registrosDoUsuario.find(r => r.tipo === 'Entrada');
-                            if (registroEntrada && expediente) {
+                            <% const registroEntrada=registrosDoUsuario.find(r => r.tipo === 'Entrada');
+                                if (registroEntrada && expediente) {
                                 const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}`);
                                 const horaEntradaReal = new Date(registroEntrada.timestamp);
                                 if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() || (horaEntradaReal.getHours() === horaEntradaEsperada.getHours() && horaEntradaReal.getMinutes() > horaEntradaEsperada.getMinutes())) {
                             %>
-                                <span style="font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">Atrasado</span>
-                            <% 
-                                }
-                            } 
-                            %>
+                            <span style="font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">Atrasado</span>
+                            <% } } %>
                             <div><strong>Total:</strong> <%= horas[usuario.id] %></div>
                         </td>
                         <td>
@@ -125,7 +134,7 @@
                                 <button type="submit">Agendar Férias</button>
                             </form>
                             <ul class="ferias-lista">
-                                <% const feriasDoUsuario = ferias[usuario.id] || []; %>
+                                <% const feriasDoUsuario=ferias[usuario.id] || []; %>
                                 <% if (feriasDoUsuario.length > 0) { %>
                                     <% feriasDoUsuario.forEach(f => { %>
                                         <li>
@@ -139,11 +148,14 @@
                                 <% } %>
                             </ul>
                         </td>
+                        <td>
+                            <a href="/rh/funcionario/editar/<%= usuario.id %>" class="btn-edit">Editar</a>
+                        </td>
                     </tr>
                 <% }) %>
             <% } else { %>
                 <tr>
-                    <td colspan="6" style="text-align: center;">Nenhum funcionário cadastrado.</td>
+                    <td colspan="7" style="text-align: center;">Nenhum funcionário cadastrado.</td>
                 </tr>
             <% } %>
         </tbody>

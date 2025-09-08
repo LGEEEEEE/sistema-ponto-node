@@ -82,22 +82,34 @@ app.set('trust proxy', true);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Configuração da Sessão com PostgreSQL
-const pool = new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-
-app.use(session({
-    store: new PgStore({
-        pool: pool,
-        tableName: 'session'
-    }),
-    secret: 'um-segredo-muito-forte-para-proteger-as-sessoes',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 dias
-}));
+// --- CONFIGURAÇÃO DE SESSÃO INTELIGENTE ---
+if (process.env.NODE_ENV === 'production') {
+    // Em produção (Render), usa o PostgreSQL para as sessões
+    const pool = new pg.Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    });
+    app.use(session({
+        store: new PgStore({
+            pool: pool,
+            tableName: 'session'
+        }),
+        secret: 'um-segredo-muito-forte-para-proteger-as-sessoes',
+        resave: false,
+        saveUninitialized: false,
+        cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 } // 30 dias
+    }));
+} else {
+    // Localmente, continua usando o SQLite para as sessões
+    const SQLiteStore = require('connect-sqlite3')(session);
+    app.use(session({
+        store: new SQLiteStore({ db: 'sessions.sqlite', concurrentDB: true }),
+        secret: 'um-segredo-muito-forte-para-proteger-as-sessoes',
+        resave: false,
+        saveUninitialized: false,
+        cookie: { maxAge: 24 * 60 * 60 * 1000 } // 1 dia
+    }));
+}
 
 
 // =================================================================
@@ -300,6 +312,62 @@ app.post('/registrar', checarAutenticacao, restringirPorIP, async (req, res) => 
 });
 
 // --- Rotas do RH (Multi-Tenant) ---
+
+// index.js -> Adicione estas duas rotas
+
+// ROTA PARA MOSTRAR A PÁGINA DE EDIÇÃO
+app.get('/rh/funcionario/editar/:id', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
+    try {
+        const { empresaId } = req.session;
+        const funcionarioId = req.params.id;
+
+        const funcionario = await User.findOne({
+            where: {
+                id: funcionarioId,
+                EmpresaId: empresaId,
+                role: 'funcionario'
+            }
+        });
+
+        if (!funcionario) {
+            return res.status(404).send('Funcionário não encontrado ou não pertence à sua empresa.');
+        }
+
+        res.render('editar_funcionario', { funcionario: funcionario });
+    } catch (error) {
+        console.error("Erro ao carregar página de edição:", error);
+        res.status(500).send('Ocorreu um erro.');
+    }
+});
+
+// ROTA PARA SALVAR OS DADOS EDITADOS
+app.post('/rh/funcionario/editar/:id', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
+    try {
+        const { empresaId } = req.session;
+        const funcionarioId = req.params.id;
+        const { nome, email, senha } = req.body;
+
+        const dadosParaAtualizar = { nome, email };
+
+        // Se uma nova senha foi fornecida, criptografa e adiciona aos dados
+        if (senha) {
+            dadosParaAtualizar.senha = await bcrypt.hash(senha, 10);
+        }
+
+        await User.update(dadosParaAtualizar, {
+            where: {
+                id: funcionarioId,
+                EmpresaId: empresaId
+            }
+        });
+
+        res.redirect('/rh/dashboard');
+    } catch (error) {
+        console.error("Erro ao salvar edição do funcionário:", error);
+        res.status(500).send('Ocorreu um erro ao salvar as alterações.');
+    }
+});
+
 app.get('/rh/dashboard', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { empresaId } = req.session;
@@ -344,7 +412,7 @@ app.post('/rh/definir-horario/:userId', checarAutenticacao, checarAutorizacaoRH,
 app.post('/rh/ferias/agendar', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { funcionarioId, dataInicio, dataFim } = req.body;
-        const funcionario = await User.findOne({ where: { id: funcionarioId, EmpresaId: req.session.empresaId }});
+        const funcionario = await User.findOne({ where: { id: funcionarioId, EmpresaId: req.session.empresaId } });
         if (!funcionario || !dataInicio || !dataFim || new Date(dataFim) < new Date(dataInicio)) {
             return res.status(400).send('Dados inválidos ou funcionário não pertence à sua empresa.');
         }
