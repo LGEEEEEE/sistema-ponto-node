@@ -180,7 +180,11 @@
         </div>
     </div>
 
-    <p><a href="/dashboard">← Voltar para minha dashboard</a> | <a href="/rh/relatorios">Ver Relatório de Faltas</a></p>
+    <p>
+        <a href="/dashboard">← Voltar para minha dashboard</a> |
+        <a href="/rh/relatorios">Relatório de Faltas</a> |
+        <a href="/rh/relatorios/folha-ponto">Folha de Ponto Detalhada</a>
+    </p>
 
     <div class="config-box">
         <h2>Configurações Gerais</h2>
@@ -235,11 +239,24 @@
                                 <% if (registrosDoUsuario.length> 0) { %>
                                     <ul style="list-style-type: none; padding: 0; margin: 0;">
                                         <% registrosDoUsuario.forEach(registro=> { %>
-                                            <li><strong>
-                                                    <%= registro.tipo %>:
-                                                </strong>
-                                                <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', {
-                                                    timeZone: 'America/Sao_Paulo' }) %>
+                                            <li
+                                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding: 2px 0;">
+                                                <span>
+                                                    <strong>
+                                                        <%= registro.tipo %>:
+                                                    </strong>
+                                                    <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', {
+                                                        timeZone: 'America/Sao_Paulo' }) %>
+                                                </span>
+
+                                                <form action="/rh/registro/excluir/<%= registro.id %>" method="POST"
+                                                    style="display: inline; margin-left: 10px;">
+                                                    <button type="submit"
+                                                        onclick="return confirm('Tem certeza que deseja excluir esta batida?');"
+                                                        style="background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 14px; padding: 2px; text-decoration: underline;">
+                                                        Excluir
+                                                    </button>
+                                                </form>
                                             </li>
                                             <% }) %>
                                     </ul>
@@ -248,8 +265,8 @@
                                         <% } %>
                         </td>
                         <td>
-                            <% const registroEntrada=registrosDoUsuario.find(r=> r.tipo === 'Entrada');
-                                if (registroEntrada && expediente) {
+                            <% const registroEntrada=registrosDoUsuario.find(r=> r.tipo === 'Entrada'); if
+                                (registroEntrada && expediente) {
                                 const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}`);
                                 const horaEntradaReal = new Date(registroEntrada.timestamp);
                                 if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() ||
