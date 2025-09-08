@@ -507,6 +507,7 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
 });
 
 // ROTA FINAL PARA O RELATÓRIO DETALHADO (FOLHA DE PONTO) POR PERÍODO
+// ROTA TOTALMENTE REESTRUTURADA PARA EXIBIR RELATÓRIO SEMANAL
 app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { empresaId } = req.session;
@@ -516,114 +517,107 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
         const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId }, order: [['nome', 'ASC']] });
 
         if (!dataInicio || !dataFim || !funcionarioId) {
-            return res.render('folha_ponto', {
-                relatorio: null,
+            return res.render('folha_ponto_semanal', {
+                relatorioAgrupado: null,
                 listaFuncionarios,
                 dataInicioSelecionada: hoje,
                 dataFimSelecionada: hoje,
-                funcionarioIdSelecionado: null,
-                funcionario: null
+                funcionarioIdSelecionado: null
             });
         }
 
         const dataInicioObj = new Date(`${dataInicio}T00:00:00-03:00`);
         const dataFimObj = new Date(`${dataFim}T23:59:59-03:00`);
 
-        let funcionariosParaProcessar = [];
-        if (funcionarioId === 'todos') {
-            funcionariosParaProcessar = listaFuncionarios;
-        } else {
-            const func = listaFuncionarios.find(f => f.id == funcionarioId);
-            if (func) funcionariosParaProcessar.push(func);
-        }
+        let funcionariosParaProcessar = (funcionarioId === 'todos') ? listaFuncionarios : listaFuncionarios.filter(f => f.id == funcionarioId);
 
-        if (funcionariosParaProcessar.length === 0) {
-            return res.status(404).send("Nenhum funcionário encontrado para processar.");
-        }
+        if (funcionariosParaProcessar.length === 0) return res.status(404).send("Nenhum funcionário encontrado.");
 
         const idsDosFuncionarios = funcionariosParaProcessar.map(f => f.id);
         const [registros, ferias, configAlmoco] = await Promise.all([
-            RegistroPonto.findAll({ where: { UserId: idsDosFuncionarios, timestamp: { [Op.between]: [dataInicioObj, dataFimObj] } }, order: [['timestamp', 'ASC']] }),
+            RegistroPonto.findAll({ where: { UserId: idsDosFuncionarios, timestamp: { [Op.between]: [dataInicioObj, dataFimObj] } } }),
             Ferias.findAll({ where: { UserId: idsDosFuncionarios } }),
             Configuracao.findOne({ where: { chave: 'duracao_almoco_minutos', EmpresaId: empresaId } })
         ]);
         
         const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
-
-        // Pré-agrupa os dados para otimizar os loops
-        const registrosPorUsuario = {};
-        registros.forEach(r => {
-            (registrosPorUsuario[r.UserId] = registrosPorUsuario[r.UserId] || []).push(r);
-        });
-        const feriasPorUsuario = {};
-        ferias.forEach(f => {
-            (feriasPorUsuario[f.UserId] = feriasPorUsuario[f.UserId] || []).push(f);
-        });
-
-        const relatorio = [];
-        let dataAtualLoop = new Date(dataInicioObj);
         
-        while (dataAtualLoop <= dataFimObj) {
-            for (const funcionario of funcionariosParaProcessar) {
+        // Objeto para agrupar todos os dados calculados por funcionário
+        const relatorioAgrupado = [];
+
+        for (const funcionario of funcionariosParaProcessar) {
+            const dadosFuncionario = {
+                id: funcionario.id,
+                nome: funcionario.nome,
+                semanas: []
+            };
+
+            const registrosDoFunc = registros.filter(r => r.UserId === funcionario.id).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+            const feriasDoFunc = ferias.filter(f => f.UserId === funcionario.id);
+
+            let semanaAtual = {};
+            let dataAtualLoop = new Date(dataInicioObj);
+
+            while (dataAtualLoop <= dataFimObj) {
+                const diaDaSemana = dataAtualLoop.getDay(); // 0-Dom, 1-Seg, ..., 6-Sáb
                 const diaString = dataAtualLoop.toISOString().split('T')[0];
-                const diaDaSemana = dataAtualLoop.getDay();
-
-                const registrosDoDia = (registrosPorUsuario[funcionario.id] || []).filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
                 
-                const diaInfo = {
-                    funcionarioNome: funcionario.nome,
-                    data: new Date(dataAtualLoop),
-                    registros: registrosDoDia,
-                    horasTrabalhadas: '00h 00m',
-                    saldoHoras: '',
-                    observacao: ''
-                };
-
-                if (diaDaSemana === 0 || diaDaSemana === 6) {
-                    diaInfo.observacao = 'Fim de semana';
-                } else {
-                    const feriasDoFunc = feriasPorUsuario[funcionario.id] || [];
+                // Ignora Sábados e Domingos
+                if (diaDaSemana > 0 && diaDaSemana < 6) {
+                    const registrosDoDia = registrosDoFunc.filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
+                    const diaInfo = {
+                        data: new Date(dataAtualLoop),
+                        registros: registrosDoDia,
+                        horasTrabalhadas: '00h 00m', saldoHoras: '', observacao: ''
+                    };
+                    
+                    // Lógica de cálculo (Férias, Falta, Horas, Saldo)
                     const estaDeFerias = feriasDoFunc.some(f => {
-                        const inicioFerias = new Date(f.dataInicio + 'T00:00:00-03:00');
-                        const fimFerias = new Date(f.dataFim + 'T23:59:59-03:00');
-                        return dataAtualLoop >= inicioFerias && dataAtualLoop <= fimFerias;
+                        const inicio = new Date(f.dataInicio + 'T00:00:00-03:00');
+                        const fim = new Date(f.dataFim + 'T23:59:59-03:00');
+                        return dataAtualLoop >= inicio && dataAtualLoop <= fim;
                     });
 
-                    if (estaDeFerias) {
-                        diaInfo.observacao = 'Férias';
-                    } else if (diaInfo.registros.length === 0) {
-                        diaInfo.observacao = 'Falta';
+                    if (estaDeFerias) { diaInfo.observacao = 'Férias'; }
+                    else if (registrosDoDia.length === 0) { diaInfo.observacao = 'Falta'; }
+
+                    if (registrosDoDia.length > 0) {
+                        diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(registrosDoDia);
+                        if (diaInfo.horasTrabalhadas !== 'Jornada em aberto') {
+                           const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
+                           const [hE, mE] = expediente.entrada.split(':').map(Number);
+                           const [hS, mS] = expediente.saida.split(':').map(Number);
+                           const jornadaMin = ((hS - hE) * 60) + (mS - mE) - duracaoAlmoco;
+                           const [hT, mT] = diaInfo.horasTrabalhadas.replace('h ', 'm').slice(0, -1).split('m');
+                           const trabalhadoMin = (parseInt(hT) * 60) + parseInt(mT);
+                           const saldoMin = trabalhadoMin - jornadaMin;
+                           const sinal = saldoMin >= 0 ? '+' : '-';
+                           const hSaldo = Math.floor(Math.abs(saldoMin) / 60).toString().padStart(2, '0');
+                           const mSaldo = (Math.abs(saldoMin) % 60).toString().padStart(2, '0');
+                           diaInfo.saldoHoras = `${sinal}${hSaldo}h ${mSaldo}m`;
+                        }
                     }
+                    
+                    // Adiciona o dia na semana correta (segunda, terca, etc.)
+                    const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta'];
+                    semanaAtual[dias[diaDaSemana]] = diaInfo;
                 }
 
-                if (diaInfo.registros.length > 0) {
-                    diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(diaInfo.registros);
-                    const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
-                    const [hEntrada, mEntrada] = expediente.entrada.split(':').map(Number);
-                    const [hSaida, mSaida] = expediente.saida.split(':').map(Number);
-                    const jornadaEsperadaMinutos = ((hSaida - hEntrada) * 60) + (mSaida - mEntrada) - duracaoAlmoco;
-
-                    if (diaInfo.horasTrabalhadas !== 'Jornada em aberto') {
-                        const [hTrab, mTrab] = diaInfo.horasTrabalhadas.replace('h ', 'm').slice(0, -1).split('m');
-                        const totalTrabalhadoMinutos = (parseInt(hTrab) * 60) + parseInt(mTrab);
-                        const saldoMinutos = totalTrabalhadoMinutos - jornadaEsperadaMinutos;
-                        const sinal = saldoMinutos >= 0 ? '+' : '-';
-                        const hSaldo = Math.floor(Math.abs(saldoMinutos) / 60).toString().padStart(2, '0');
-                        const mSaldo = (Math.abs(saldoMinutos) % 60).toString().padStart(2, '0');
-                        diaInfo.saldoHoras = `${sinal}${hSaldo}h ${mSaldo}m`;
+                // Se for sexta-feira ou o último dia do período, fecha a semana
+                if (diaDaSemana === 5 || dataAtualLoop.getTime() === dataFimObj.getTime()) {
+                    if (Object.keys(semanaAtual).length > 0) {
+                        dadosFuncionario.semanas.push(semanaAtual);
                     }
+                    semanaAtual = {};
                 }
-                relatorio.push(diaInfo);
+                
+                dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
             }
-            dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
+            relatorioAgrupado.push(dadosFuncionario);
         }
-        
-        // Ordena o relatório final por data e depois por nome do funcionário
-        relatorio.sort((a, b) => a.data - b.data || a.funcionarioNome.localeCompare(b.funcionarioNome));
 
-        res.render('folha_ponto', {
-            relatorio,
-            funcionario: funcionarioId !== 'todos' ? funcionariosParaProcessar[0] : null,
+        res.render('folha_ponto_semanal', {
+            relatorioAgrupado,
             listaFuncionarios,
             dataInicioSelecionada: dataInicio,
             dataFimSelecionada: dataFim,
@@ -631,7 +625,7 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
         });
 
     } catch (error) {
-        console.error("Erro ao gerar folha de ponto:", error);
+        console.error("Erro ao gerar folha de ponto semanal:", error);
         res.status(500).send('Ocorreu um erro ao gerar o relatório detalhado.');
     }
 });
