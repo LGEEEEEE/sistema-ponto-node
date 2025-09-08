@@ -81,14 +81,14 @@
                                         <td>
                                             <ul>
                                             <% dia.registros.forEach(r => { %>
-                                                <li><strong><%= r.tipo %>:</strong> <%= new Date(r.timestamp).toLocaleTimeString('pt-BR') %></li>
+                                                <li><strong><%= r.tipo %>:</strong> <%= new Date(r.timestamp).toLocaleTimeString('pt-BR', {timeZone: 'America/Sao_Paulo' }) %></li>
                                             <% }) %>
                                             </ul>
                                         </td>
                                         <td><%= dia.horasTrabalhadas %></td>
                                         <td class="<%= dia.saldoHoras.startsWith('+') ? 'saldo-positivo' : 'saldo-negativo' %>"><%= dia.saldoHoras %></td>
                                         <td class="observacao-<%= dia.observacao.toLowerCase().replace(' ', '-') %>"><%= dia.observacao %></td>
-                                    <% } else { %>
+                            ''        <% } else { %>
                                         <td colspan="5" style="background-color: #f9f9f9;"></td>
                                     <% } %>
                                 </tr>
