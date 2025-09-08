@@ -506,7 +506,6 @@ app.get('/rh/relatorios', checarAutenticacao, checarAutorizacaoRH, async (req, r
     }
 });
 
-// ROTA FINAL PARA O RELATÓRIO DETALHADO (FOLHA DE PONTO) POR PERÍODO
 // ROTA TOTALMENTE REESTRUTURADA PARA EXIBIR RELATÓRIO SEMANAL
 app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
@@ -542,7 +541,6 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
         
         const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
         
-        // Objeto para agrupar todos os dados calculados por funcionário
         const relatorioAgrupado = [];
 
         for (const funcionario of funcionariosParaProcessar) {
@@ -559,10 +557,9 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
             let dataAtualLoop = new Date(dataInicioObj);
 
             while (dataAtualLoop <= dataFimObj) {
-                const diaDaSemana = dataAtualLoop.getDay(); // 0-Dom, 1-Seg, ..., 6-Sáb
+                const diaDaSemana = dataAtualLoop.getDay();
                 const diaString = dataAtualLoop.toISOString().split('T')[0];
                 
-                // Ignora Sábados e Domingos
                 if (diaDaSemana > 0 && diaDaSemana < 6) {
                     const registrosDoDia = registrosDoFunc.filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
                     const diaInfo = {
@@ -571,7 +568,6 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
                         horasTrabalhadas: '00h 00m', saldoHoras: '', observacao: ''
                     };
                     
-                    // Lógica de cálculo (Férias, Falta, Horas, Saldo)
                     const estaDeFerias = feriasDoFunc.some(f => {
                         const inicio = new Date(f.dataInicio + 'T00:00:00-03:00');
                         const fim = new Date(f.dataFim + 'T23:59:59-03:00');
@@ -598,13 +594,11 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
                         }
                     }
                     
-                    // Adiciona o dia na semana correta (segunda, terca, etc.)
                     const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta'];
                     semanaAtual[dias[diaDaSemana]] = diaInfo;
                 }
 
-                // Se for sexta-feira ou o último dia do período, fecha a semana
-                if (diaDaSemana === 5 || dataAtualLoop.getTime() === dataFimObj.getTime()) {
+                if (diaDaSemana === 5) {
                     if (Object.keys(semanaAtual).length > 0) {
                         dadosFuncionario.semanas.push(semanaAtual);
                     }
@@ -613,6 +607,12 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
                 
                 dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
             }
+
+            // Após o fim do loop, salva a última semana processada, caso ela não esteja vazia
+            if (Object.keys(semanaAtual).length > 0) {
+                dadosFuncionario.semanas.push(semanaAtual);
+            }
+
             relatorioAgrupado.push(dadosFuncionario);
         }
 
