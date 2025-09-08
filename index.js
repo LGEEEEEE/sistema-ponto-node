@@ -12,7 +12,8 @@ const pg = require('pg');
 const PgStore = require('connect-pg-simple')(session);
 const app = express();
 const port = process.env.PORT || 3000;
-const puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer-core');
+const chromium = require('@sparticuz/chromium');
 const ejs = require('ejs');
 
 
@@ -903,7 +904,7 @@ app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, asyn
     }
 });
 
-// ROTA PARA GERAR O ESPELHO DE PONTO EM PDF
+// ROTA PARA GERAR O ESPELHO DE PONTO EM PDF - CORRIGIDA PARA RENDER
 app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const { empresaId } = req.session;
@@ -913,17 +914,10 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
             return res.status(400).send("Parâmetros de filtro ausentes para gerar o PDF.");
         }
 
-        // =================================================================
-        // REUTILIZAÇÃO DA LÓGICA DE BUSCA E PROCESSAMENTO DE DADOS
-        // =================================================================
+        // ... (TODA A SUA LÓGICA DE BUSCAR E PROCESSAR OS DADOS CONTINUA EXATAMENTE A MESMA AQUI) ...
         const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId }, order: [['nome', 'ASC']] });
         let funcionariosParaProcessar = (funcionarioId === 'todos') ? listaFuncionarios : listaFuncionarios.filter(f => f.id == funcionarioId);
         const empresa = await Empresa.findByPk(empresaId);
-
-        // ... (Aqui entra a mesma lógica de busca e processamento da rota anterior)
-        // Para evitar um bloco de código gigante, vamos assumir que a variável `relatorioAgrupado` é montada
-        // exatamente como na rota `GET /rh/relatorios/folha-ponto`
-
         const dataInicioObj = new Date(`${dataInicio}T00:00:00-03:00`);
         const dataFimObj = new Date(`${dataFim}T23:59:59-03:00`);
         const idsDosFuncionarios = funcionariosParaProcessar.map(f => f.id);
@@ -973,7 +967,7 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
         }
 
         // =================================================================
-        // NOVA LÓGICA DE GERAÇÃO DE PDF COM PUPPETEER
+        // LÓGICA DE GERAÇÃO DE PDF ATUALIZADA
         // =================================================================
         const filePath = path.join(__dirname, 'views', 'espelho_ponto_pdf.ejs');
         const html = await ejs.renderFile(filePath, {
@@ -983,7 +977,14 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
             empresa
         });
 
-        const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+        // Bloco de inicialização do Puppeteer CORRIGIDO
+        const browser = await puppeteer.launch({
+            args: chromium.args,
+            defaultViewport: chromium.defaultViewport,
+            executablePath: await chromium.executablePath(),
+            headless: chromium.headless,
+        });
+
         const page = await browser.newPage();
         await page.setContent(html, { waitUntil: 'networkidle0' });
 

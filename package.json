@@ -12,6 +12,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@sparticuz/chromium": "^138.0.2",
     "bcryptjs": "^3.0.2",
     "connect-pg-simple": "^10.0.0",
     "connect-sqlite3": "^0.9.16",
@@ -20,7 +21,7 @@
     "express": "^5.1.0",
     "express-session": "^1.18.2",
     "pg": "^8.16.3",
-    "puppeteer": "^24.19.0",
+    "puppeteer-core": "^24.19.0",
     "sequelize": "^6.37.7",
     "sqlite3": "^5.1.7"
   },
