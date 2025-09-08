@@ -10,9 +10,10 @@ const bcrypt = require('bcryptjs');
 const { Sequelize, DataTypes, Op } = require('sequelize');
 const pg = require('pg');
 const PgStore = require('connect-pg-simple')(session);
-
 const app = express();
 const port = process.env.PORT || 3000;
+const puppeteer = require('puppeteer');
+const ejs = require('ejs');
 
 
 // =================================================================
@@ -256,6 +257,108 @@ app.post('/logout', (req, res) => {
         res.clearCookie('connect.sid');
         res.redirect('/login');
     });
+});
+
+// ROTA PARA O FUNCIONÁRIO VER SEU PRÓPRIO RELATÓRIO
+app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
+    try {
+        const { userId, empresaId } = req.session;
+        const { dataInicio, dataFim } = req.query;
+
+        // Se não houver datas, não carrega dados
+        if (!dataInicio || !dataFim) {
+            const hoje = new Date().toISOString().split('T')[0];
+            return res.render('meu_relatorio', {
+                relatorioAgrupado: null,
+                dataInicioSelecionada: hoje,
+                dataFimSelecionada: hoje
+            });
+        }
+
+        const funcionario = await User.findByPk(userId);
+        if (!funcionario) return res.status(404).send("Funcionário não encontrado.");
+
+        // A lógica de busca e agrupamento de dados é muito parecida com a do RH
+        const dataInicioObj = new Date(`${dataInicio}T00:00:00-03:00`);
+        const dataFimObj = new Date(`${dataFim}T23:59:59-03:00`);
+
+        const [registros, ferias, configAlmoco] = await Promise.all([
+            RegistroPonto.findAll({ where: { UserId: userId, timestamp: { [Op.between]: [dataInicioObj, dataFimObj] } } }),
+            Ferias.findAll({ where: { UserId: userId } }),
+            Configuracao.findOne({ where: { chave: 'duracao_almoco_minutos', EmpresaId: empresaId } })
+        ]);
+
+        const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
+        const registrosDoFunc = registros.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        const dadosFuncionario = {
+            semanas: []
+        };
+        let semanaAtual = {};
+        let dataAtualLoop = new Date(dataInicioObj);
+
+        while (dataAtualLoop <= dataFimObj) {
+            const diaDaSemana = dataAtualLoop.getDay();
+            const diaString = dataAtualLoop.toISOString().split('T')[0];
+
+            if (diaDaSemana > 0 && diaDaSemana < 6) {
+                const registrosDoDia = registrosDoFunc.filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
+                const diaInfo = {
+                    data: new Date(dataAtualLoop),
+                    registros: registrosDoDia,
+                    horasTrabalhadas: '00h 00m', saldoHoras: '', observacao: ''
+                };
+
+                const estaDeFerias = ferias.some(f => {
+                    const inicio = new Date(f.dataInicio + 'T00:00:00-03:00');
+                    const fim = new Date(f.dataFim + 'T23:59:59-03:00');
+                    return dataAtualLoop >= inicio && dataAtualLoop <= fim;
+                });
+
+                if (estaDeFerias) { diaInfo.observacao = 'Férias'; }
+                else if (registrosDoDia.length === 0) { diaInfo.observacao = 'Falta'; }
+
+                if (registrosDoDia.length > 0) {
+                    diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(registrosDoDia);
+                    if (diaInfo.horasTrabalhadas !== 'Jornada em aberto') {
+                        const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
+                        const [hE, mE] = expediente.entrada.split(':').map(Number);
+                        const [hS, mS] = expediente.saida.split(':').map(Number);
+                        const jornadaMin = ((hS - hE) * 60) + (mS - mE) - duracaoAlmoco;
+                        const [hT, mT] = diaInfo.horasTrabalhadas.replace('h ', 'm').slice(0, -1).split('m');
+                        const trabalhadoMin = (parseInt(hT) * 60) + parseInt(mT);
+                        const saldoMin = trabalhadoMin - jornadaMin;
+                        const sinal = saldoMin >= 0 ? '+' : '-';
+                        const hSaldo = Math.floor(Math.abs(saldoMin) / 60).toString().padStart(2, '0');
+                        const mSaldo = (Math.abs(saldoMin) % 60).toString().padStart(2, '0');
+                        diaInfo.saldoHoras = `${sinal}${hSaldo}h ${mSaldo}m`;
+                    }
+                }
+                const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta'];
+                semanaAtual[dias[diaDaSemana]] = diaInfo;
+            }
+
+            if (diaDaSemana === 5) {
+                if (Object.keys(semanaAtual).length > 0) dadosFuncionario.semanas.push(semanaAtual);
+                semanaAtual = {};
+            }
+            dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
+        }
+
+        if (Object.keys(semanaAtual).length > 0) {
+            dadosFuncionario.semanas.push(semanaAtual);
+        }
+
+        res.render('meu_relatorio', {
+            relatorioAgrupado: dadosFuncionario,
+            dataInicioSelecionada: dataInicio,
+            dataFimSelecionada: dataFim
+        });
+
+    } catch (error) {
+        console.error("Erro ao gerar relatório do funcionário:", error);
+        res.status(500).send('Ocorreu um erro.');
+    }
 });
 
 // --- Rotas de Autenticação do RH ---
@@ -538,9 +641,9 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
             Ferias.findAll({ where: { UserId: idsDosFuncionarios } }),
             Configuracao.findOne({ where: { chave: 'duracao_almoco_minutos', EmpresaId: empresaId } })
         ]);
-        
+
         const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
-        
+
         const relatorioAgrupado = [];
 
         for (const funcionario of funcionariosParaProcessar) {
@@ -550,7 +653,7 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
                 semanas: []
             };
 
-            const registrosDoFunc = registros.filter(r => r.UserId === funcionario.id).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+            const registrosDoFunc = registros.filter(r => r.UserId === funcionario.id).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
             const feriasDoFunc = ferias.filter(f => f.UserId === funcionario.id);
 
             let semanaAtual = {};
@@ -559,7 +662,7 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
             while (dataAtualLoop <= dataFimObj) {
                 const diaDaSemana = dataAtualLoop.getDay();
                 const diaString = dataAtualLoop.toISOString().split('T')[0];
-                
+
                 if (diaDaSemana > 0 && diaDaSemana < 6) {
                     const registrosDoDia = registrosDoFunc.filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
                     const diaInfo = {
@@ -567,7 +670,7 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
                         registros: registrosDoDia,
                         horasTrabalhadas: '00h 00m', saldoHoras: '', observacao: ''
                     };
-                    
+
                     const estaDeFerias = feriasDoFunc.some(f => {
                         const inicio = new Date(f.dataInicio + 'T00:00:00-03:00');
                         const fim = new Date(f.dataFim + 'T23:59:59-03:00');
@@ -580,20 +683,20 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
                     if (registrosDoDia.length > 0) {
                         diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(registrosDoDia);
                         if (diaInfo.horasTrabalhadas !== 'Jornada em aberto') {
-                           const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
-                           const [hE, mE] = expediente.entrada.split(':').map(Number);
-                           const [hS, mS] = expediente.saida.split(':').map(Number);
-                           const jornadaMin = ((hS - hE) * 60) + (mS - mE) - duracaoAlmoco;
-                           const [hT, mT] = diaInfo.horasTrabalhadas.replace('h ', 'm').slice(0, -1).split('m');
-                           const trabalhadoMin = (parseInt(hT) * 60) + parseInt(mT);
-                           const saldoMin = trabalhadoMin - jornadaMin;
-                           const sinal = saldoMin >= 0 ? '+' : '-';
-                           const hSaldo = Math.floor(Math.abs(saldoMin) / 60).toString().padStart(2, '0');
-                           const mSaldo = (Math.abs(saldoMin) % 60).toString().padStart(2, '0');
-                           diaInfo.saldoHoras = `${sinal}${hSaldo}h ${mSaldo}m`;
+                            const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
+                            const [hE, mE] = expediente.entrada.split(':').map(Number);
+                            const [hS, mS] = expediente.saida.split(':').map(Number);
+                            const jornadaMin = ((hS - hE) * 60) + (mS - mE) - duracaoAlmoco;
+                            const [hT, mT] = diaInfo.horasTrabalhadas.replace('h ', 'm').slice(0, -1).split('m');
+                            const trabalhadoMin = (parseInt(hT) * 60) + parseInt(mT);
+                            const saldoMin = trabalhadoMin - jornadaMin;
+                            const sinal = saldoMin >= 0 ? '+' : '-';
+                            const hSaldo = Math.floor(Math.abs(saldoMin) / 60).toString().padStart(2, '0');
+                            const mSaldo = (Math.abs(saldoMin) % 60).toString().padStart(2, '0');
+                            diaInfo.saldoHoras = `${sinal}${hSaldo}h ${mSaldo}m`;
                         }
                     }
-                    
+
                     const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta'];
                     semanaAtual[dias[diaDaSemana]] = diaInfo;
                 }
@@ -604,7 +707,7 @@ app.get('/rh/relatorios/folha-ponto', checarAutenticacao, checarAutorizacaoRH, a
                     }
                     semanaAtual = {};
                 }
-                
+
                 dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
             }
 
@@ -639,7 +742,7 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
         if (!dataInicio || !dataFim || !funcionarioId) {
             return res.status(400).send("Parâmetros de filtro ausentes.");
         }
-        
+
         // =================================================================
         // REUTILIZAÇÃO DA LÓGICA DE BUSCA E PROCESSAMENTO DE DADOS
         // (Este trecho é quase idêntico ao da rota anterior)
@@ -665,7 +768,7 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
             Ferias.findAll({ where: { UserId: idsDosFuncionarios } }),
             Configuracao.findOne({ where: { chave: 'duracao_almoco_minutos', EmpresaId: empresaId } })
         ]);
-        
+
         const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
         const registrosPorUsuario = {};
         registros.forEach(r => { (registrosPorUsuario[r.UserId] = registrosPorUsuario[r.UserId] || []).push(r); });
@@ -679,9 +782,9 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
                 const diaString = dataAtualLoop.toISOString().split('T')[0];
                 const diaDaSemana = dataAtualLoop.getDay();
                 const registrosDoDia = (registrosPorUsuario[funcionario.id] || []).filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
-                
+
                 const diaInfo = { /* ... (lógica interna idêntica para montar o diaInfo) ... */ };
-                 Object.assign(diaInfo, {
+                Object.assign(diaInfo, {
                     funcionarioNome: funcionario.nome,
                     data: new Date(dataAtualLoop),
                     registros: registrosDoDia,
@@ -729,7 +832,7 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
             const funcionario = isForAll ? `"${dia.funcionarioNome.replace(/"/g, '""')}",` : '';
             const data = dia.data.toLocaleDateString('pt-BR');
             const diaSemana = dia.data.toLocaleDateString('pt-BR', { weekday: 'long' });
-            
+
             // Formata os registros em uma única string, separados por " | "
             const registrosStr = dia.registros.map(r => `${r.tipo}: ${new Date(r.timestamp).toLocaleTimeString('pt-BR')}`).join(' | ');
 
@@ -800,6 +903,108 @@ app.get('/rh/relatorios/download', checarAutenticacao, checarAutorizacaoRH, asyn
     }
 });
 
+// ROTA PARA GERAR O ESPELHO DE PONTO EM PDF
+app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
+    try {
+        const { empresaId } = req.session;
+        const { dataInicio, dataFim, funcionarioId } = req.query;
+
+        if (!dataInicio || !dataFim || !funcionarioId) {
+            return res.status(400).send("Parâmetros de filtro ausentes para gerar o PDF.");
+        }
+
+        // =================================================================
+        // REUTILIZAÇÃO DA LÓGICA DE BUSCA E PROCESSAMENTO DE DADOS
+        // =================================================================
+        const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId }, order: [['nome', 'ASC']] });
+        let funcionariosParaProcessar = (funcionarioId === 'todos') ? listaFuncionarios : listaFuncionarios.filter(f => f.id == funcionarioId);
+        const empresa = await Empresa.findByPk(empresaId);
+
+        // ... (Aqui entra a mesma lógica de busca e processamento da rota anterior)
+        // Para evitar um bloco de código gigante, vamos assumir que a variável `relatorioAgrupado` é montada
+        // exatamente como na rota `GET /rh/relatorios/folha-ponto`
+
+        const dataInicioObj = new Date(`${dataInicio}T00:00:00-03:00`);
+        const dataFimObj = new Date(`${dataFim}T23:59:59-03:00`);
+        const idsDosFuncionarios = funcionariosParaProcessar.map(f => f.id);
+        const [registros, ferias, configAlmoco] = await Promise.all([
+            RegistroPonto.findAll({ where: { UserId: idsDosFuncionarios, timestamp: { [Op.between]: [dataInicioObj, dataFimObj] } } }),
+            Ferias.findAll({ where: { UserId: idsDosFuncionarios } }),
+            Configuracao.findOne({ where: { chave: 'duracao_almoco_minutos', EmpresaId: empresaId } })
+        ]);
+        const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
+        const relatorioAgrupado = [];
+        for (const funcionario of funcionariosParaProcessar) {
+            const dadosFuncionario = { id: funcionario.id, nome: funcionario.nome, semanas: [] };
+            const registrosDoFunc = registros.filter(r => r.UserId === funcionario.id).sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+            const feriasDoFunc = ferias.filter(f => f.UserId === funcionario.id);
+            let semanaAtual = {};
+            let dataAtualLoop = new Date(dataInicioObj);
+            while (dataAtualLoop <= dataFimObj) {
+                const diaDaSemana = dataAtualLoop.getDay();
+                if (diaDaSemana > 0 && diaDaSemana < 6) {
+                    const registrosDoDia = registrosDoFunc.filter(r => new Date(r.timestamp).toISOString().split('T')[0] === dataAtualLoop.toISOString().split('T')[0]);
+                    const diaInfo = { data: new Date(dataAtualLoop), registros: registrosDoDia, horasTrabalhadas: '00h 00m', saldoHoras: '', observacao: '' };
+                    const estaDeFerias = feriasDoFunc.some(f => { const inicio = new Date(f.dataInicio + 'T00:00:00-03:00'); const fim = new Date(f.dataFim + 'T23:59:59-03:00'); return dataAtualLoop >= inicio && dataAtualLoop <= fim; });
+                    if (estaDeFerias) { diaInfo.observacao = 'Férias'; } else if (registrosDoDia.length === 0) { diaInfo.observacao = 'Falta'; }
+                    if (registrosDoDia.length > 0) {
+                        diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(registrosDoDia);
+                        if (diaInfo.horasTrabalhadas !== 'Jornada em aberto') {
+                           const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
+                           const [hE, mE] = expediente.entrada.split(':').map(Number); const [hS, mS] = expediente.saida.split(':').map(Number);
+                           const jornadaMin = ((hS - hE) * 60) + (mS - mE) - duracaoAlmoco;
+                           const [hT, mT] = diaInfo.horasTrabalhadas.replace('h ', 'm').slice(0, -1).split('m');
+                           const trabalhadoMin = (parseInt(hT) * 60) + parseInt(mT);
+                           const saldoMin = trabalhadoMin - jornadaMin;
+                           const sinal = saldoMin >= 0 ? '+' : '-';
+                           const hSaldo = Math.floor(Math.abs(saldoMin) / 60).toString().padStart(2, '0');
+                           const mSaldo = (Math.abs(saldoMin) % 60).toString().padStart(2, '0');
+                           diaInfo.saldoHoras = `${sinal}${hSaldo}h ${mSaldo}m`;
+                        }
+                    }
+                    const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta'];
+                    semanaAtual[dias[diaDaSemana]] = diaInfo;
+                }
+                if (diaDaSemana === 5) { if (Object.keys(semanaAtual).length > 0) dadosFuncionario.semanas.push(semanaAtual); semanaAtual = {}; }
+                dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
+            }
+            if (Object.keys(semanaAtual).length > 0) dadosFuncionario.semanas.push(semanaAtual);
+            relatorioAgrupado.push(dadosFuncionario);
+        }
+
+        // =================================================================
+        // NOVA LÓGICA DE GERAÇÃO DE PDF COM PUPPETEER
+        // =================================================================
+        const filePath = path.join(__dirname, 'views', 'espelho_ponto_pdf.ejs');
+        const html = await ejs.renderFile(filePath, {
+            relatorioAgrupado,
+            dataInicio: dataInicioObj,
+            dataFim: dataFimObj,
+            empresa
+        });
+
+        const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+        const page = await browser.newPage();
+        await page.setContent(html, { waitUntil: 'networkidle0' });
+
+        const pdfBuffer = await page.pdf({ 
+            format: 'A4', 
+            printBackground: true,
+            margin: { top: '20px', right: '20px', bottom: '20px', left: '20px' }
+        });
+
+        await browser.close();
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="espelho_ponto_${dataInicio}_a_${dataFim}.pdf"`);
+        res.send(pdfBuffer);
+
+    } catch (error) {
+        console.error("Erro ao gerar PDF do espelho de ponto:", error);
+        res.status(500).send('Ocorreu um erro ao gerar o PDF.');
+    }
+});
+
 // ROTA PARA EXCLUIR REGISTRO DE PONTO ESPECÍFICO
 app.post('/rh/registro/excluir/:id', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
@@ -836,6 +1041,59 @@ app.get('/', (req, res) => {
         res.redirect('/dashboard');
     } else {
         res.redirect('/login');
+    }
+});
+
+// ROTA PARA MOSTRAR O FORMULÁRIO DE LANÇAMENTO MANUAL
+app.get('/rh/registro-manual/:userId', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
+    try {
+        const funcionario = await User.findOne({
+            where: { id: req.params.userId, EmpresaId: req.session.empresaId }
+        });
+
+        if (!funcionario) {
+            return res.status(404).send('Funcionário não encontrado.');
+        }
+
+        res.render('registro_manual', { funcionario });
+    } catch (error) {
+        console.error("Erro ao abrir formulário de registro manual:", error);
+        res.status(500).send("Ocorreu um erro.");
+    }
+});
+
+// ROTA PARA SALVAR OS DADOS DO LANÇAMENTO MANUAL
+app.post('/rh/registro-manual/:userId', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { data, entrada, saidaAlmoco, voltaAlmoco, saida } = req.body;
+
+        if (!data) {
+            return res.status(400).send("A data é obrigatória.");
+        }
+
+        const registrosParaCriar = [
+            { tipo: 'Entrada', horario: entrada },
+            { tipo: 'Saida Almoço', horario: saidaAlmoco },
+            { tipo: 'Volta Almoço', horario: voltaAlmoco },
+            { tipo: 'Saida', horario: saida }
+        ];
+
+        for (const registro of registrosParaCriar) {
+            if (registro.horario) { // Apenas cria o registro se um horário foi fornecido
+                await RegistroPonto.create({
+                    UserId: userId,
+                    tipo: registro.tipo,
+                    timestamp: new Date(`${data}T${registro.horario}:00.000-03:00`) // Define o fuso horário
+                });
+            }
+        }
+
+        res.redirect('/rh/dashboard');
+
+    } catch (error) {
+        console.error("Erro ao salvar registro manual:", error);
+        res.status(500).send("Ocorreu um erro ao salvar os registros.");
     }
 });
 

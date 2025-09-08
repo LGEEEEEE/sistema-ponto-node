@@ -11,7 +11,7 @@
         .filtro-box { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 25px; }
         .filtro-box form { display: flex; align-items: center; gap: 15px; flex-wrap: wrap; }
         .filtro-box label { font-weight: bold; }
-        .filtro-box select, .filtro-box input, .filtro-box button { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .filtro-box select, .filtro-box input, .filtro-box button, .filtro-box a { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
         .filtro-box button { background-color: #2980b9; color: white; cursor: pointer; }
         .funcionario-bloco { margin-bottom: 40px; }
         .semana-tabela { width: 100%; border-collapse: collapse; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); background-color: #fff; }
@@ -44,6 +44,13 @@
                 <% }) %>
             </select>
             <button type="submit">Gerar Relatório</button>
+
+            <% if (relatorioAgrupado) { %>
+                <a href="/rh/relatorios/folha-ponto/pdf?dataInicio=<%= dataInicioSelecionada %>&dataFim=<%= dataFimSelecionada %>&funcionarioId=<%= funcionarioIdSelecionado %>" 
+                   style="background-color: #c0392b; color: white; border-color: #c0392b; text-decoration: none;">
+                   Baixar PDF
+                </a>
+            <% } %>
         </form>
     </div>
 

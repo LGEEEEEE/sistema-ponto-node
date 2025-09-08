@@ -317,16 +317,24 @@
                                                     <% } %>
                             </ul>
                         </td>
-                        <td>
-                            <a href="/rh/funcionario/editar/<%= usuario.id %>" class="btn-edit">Editar</a>
-
-                            <form action="/rh/funcionario/excluir/<%= usuario.id %>" method="POST"
-                                style="display: inline;">
-                                <button type="submit" class="btn-delete"
-                                    onclick="return confirm('Tem certeza que deseja excluir este funcionário? Esta ação não pode ser desfeita.');">
-                                    Excluir
-                                </button>
-                            </form>
+                        <td style="min-width: 210px;">
+                            <div>
+                                <a href="/rh/funcionario/editar/<%= usuario.id %>" class="btn-edit"
+                                    style="margin-right: 5px; margin-bottom: 5px;">Editar</a>
+                                <form action="/rh/funcionario/excluir/<%= usuario.id %>" method="POST"
+                                    style="display: inline;">
+                                    <button type="submit" class="btn-delete"
+                                        onclick="return confirm('Tem certeza que deseja excluir este funcionário? Esta ação não pode ser desfeita.');">
+                                        Excluir
+                                    </button>
+                                </form>
+                            </div>
+                            <div>
+                                <a href="/rh/registro-manual/<%= usuario.id %>"
+                                    style="background-color: #3498db; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; text-align: center; display: inline-block; margin-top: 8px;">
+                                    Lançamento Manual
+                                </a>
+                            </div>
                         </td>
                     </tr>
                     <% }) %>

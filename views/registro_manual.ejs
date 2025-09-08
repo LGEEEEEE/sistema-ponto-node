@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Lançamento Manual de Ponto</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 480px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #555;
+            margin-bottom: 24px;
+            font-size: 18px;
+            text-align: center;
+            font-weight: 400;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-sizing: border-box;
+            font-size: 16px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2980b9;
+        }
+
+        .horarios-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .submit-btn,
+        .cancel-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            text-decoration: none;
+            text-align: center;
+        }
+
+        .submit-btn {
+            background-color: #2980b9;
+            color: white;
+        }
+
+        .cancel-btn {
+            background-color: #f1f1f1;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Lançamento Manual de Ponto</h1>
+        <h2>Para: <strong>
+                <%= funcionario.nome %>
+            </strong></h2>
+
+        <form action="/rh/registro-manual/<%= funcionario.id %>" method="POST">
+            <div class="form-group">
+                <label for="data">Data do Lançamento</label>
+                <input id="data" type="date" name="data" required>
+            </div>
+
+            <hr style="border: 0; height: 1px; background-color: #eee; margin: 20px 0;">
+
+            <div class="horarios-grid">
+                <div class="form-group">
+                    <label for="entrada">Entrada</label>
+                    <input id="entrada" type="time" name="entrada">
+                </div>
+                <div class="form-group">
+                    <label for="saida">Saída</label>
+                    <input id="saida" type="time" name="saida">
+                </div>
+                <div class="form-group">
+                    <label for="saidaAlmoco">Saída Almoço</label>
+                    <input id="saidaAlmoco" type="time" name="saidaAlmoco">
+                </div>
+                <div class="form-group">
+                    <label for="voltaAlmoco">Volta Almoço</label>
+                    <input id="voltaAlmoco" type="time" name="voltaAlmoco">
+                </div>
+            </div>
+
+            <div class="btn-container">
+                <a href="/rh/dashboard" class="cancel-btn">Cancelar</a>
+                <button class="submit-btn" type="submit">Salvar Registros</button>
+            </div>
+        </form>
+    </div>
+</body>
+
+</html>

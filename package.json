@@ -20,6 +20,7 @@
     "express": "^5.1.0",
     "express-session": "^1.18.2",
     "pg": "^8.16.3",
+    "puppeteer": "^24.19.0",
     "sequelize": "^6.37.7",
     "sqlite3": "^5.1.7"
   },
