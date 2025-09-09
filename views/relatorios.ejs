@@ -65,7 +65,7 @@
                 <% faltas.forEach(falta => { %>
                     <tr>
                         <td><%= falta.nome %></td>
-                        <td><%= new Date(falta.data + 'T12:00:00').toLocaleDateString('pt-BR') %></td>
+                        <td><%= new Date(falta.data + 'T12:00:00').toLocaleDateString('pt-BR', {timeZone: 'America/Sao_Paulo' }) %></td>
                     </tr>
                 <% }) %>
             <% } else { %>

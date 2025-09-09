@@ -63,7 +63,7 @@
                                     <td>
                                         <ul>
                                         <% dia.registros.forEach(r => { %>
-                                            <li><strong><%= r.tipo %>:</strong> <%= new Date(r.timestamp).toLocaleTimeString('pt-BR') %></li>
+                                            <li><strong><%= r.tipo %>:</strong> <%= new Date(r.timestamp).toLocaleTimeString('pt-BR', {timeZone: 'America/Sao_Paulo' }) %></li>
                                         <% }) %>
                                         </ul>
                                     </td>
