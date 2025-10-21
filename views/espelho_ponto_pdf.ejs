@@ -5,82 +5,134 @@
     <title>Espelho de Ponto</title>
     <style>
         /* Estilos otimizados para impressão e PDF */
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #333; font-size: 10px; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 1px solid #ccc; padding-bottom: 10px; }
-        h1, h2 { color: #2c3e50; margin: 0; }
-        h1 { font-size: 18px; }
-        h2 { font-size: 14px; font-weight: normal; }
-        .funcionario-bloco { margin-bottom: 25px; page-break-inside: avoid; }
-        h3 { font-size: 14px; background-color: #f2f2f2; padding: 8px; border-radius: 4px; }
-        .semana-tabela { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-        .semana-tabela th, .semana-tabela td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: top; }
-        .semana-tabela th { background-color: #f2f2f2; }
-        .semana-tabela td:first-child { font-weight: bold; width: 12%; }
-        .semana-tabela ul { margin: 0; padding-left: 14px; font-size: 9px; }
-        .signature-area { margin-top: 60px; page-break-inside: avoid; text-align: center; }
-        .signature-line { border-top: 1px solid #333; width: 250px; margin: 0 auto; padding-top: 5px; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; color: #333; font-size: 9pt; line-height: 1.3; } /* Tamanho e fonte mais comuns */
+        @page { size: A4; margin: 20mm; } /* Define tamanho A4 e margens */
+
+        .header {
+            display: flex; /* Mantido flex */
+            align-items: flex-start; /* Alinha topo */
+            justify-content: space-between;
+            margin-bottom: 15px; /* Reduzido */
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 8px; /* Reduzido */
+        }
+        .header-logo {
+            max-width: 100px; /* Reduzido */
+            max-height: 50px; /* Reduzido */
+            object-fit: contain; /* Para não distorcer */
+        }
+        .header-info {
+            text-align: right;
+        }
+        h1, h2 { color: #2c3e50; margin: 1px 0; } /* Menos margem */
+        h1 { font-size: 14pt; } /* Aumentado */
+        h2 { font-size: 10pt; font-weight: normal; } /* Reduzido */
+
+        .pagina { page-break-after: always; } /* Garante quebra de página por funcionário */
+        .pagina:last-child { page-break-after: auto; }
+
+        .funcionario-bloco { margin-bottom: 20px; page-break-inside: avoid; }
+        h3 { font-size: 12pt; background-color: #f2f2f2; padding: 6px 10px; border-radius: 4px; text-align: center; margin-bottom: 10px; } /* Ajustado */
+
+        .semana-tabela { width: 100%; border-collapse: collapse; margin-bottom: 12px; page-break-inside: avoid; /* Tenta não quebrar tabela */}
+        .semana-tabela th, .semana-tabela td { border: 1px solid #ddd; padding: 5px 7px; text-align: left; vertical-align: top; font-size: 8.5pt; } /* Padding e fonte menores */
+        .semana-tabela th { background-color: #e9e9e9; font-weight: bold; } /* Cor mais suave */
+        .semana-tabela td:first-child { font-weight: bold; width: 15%; } /* Dia da semana */
+        .semana-tabela td:nth-child(2) { width: 15%; } /* Data */
+        .semana-tabela td:nth-child(3) { width: 30%; } /* Registros */
+        .semana-tabela td:nth-child(4), .semana-tabela td:nth-child(5) { width: 12%; text-align: center;} /* Total e Saldo */
+        .semana-tabela td:last-child { width: 16%; } /* Observação */
+
+        .semana-tabela ul { margin: 0; padding: 0 0 0 12px; list-style-position: outside; } /* Ajuste lista */
+        .semana-tabela li { margin-bottom: 2px; }
+
+        .signature-area { margin-top: 40px; page-break-inside: avoid; text-align: center; }
+        .signature-line { border-top: 1px solid #333; width: 280px; margin: 0 auto; padding-top: 4px; font-size: 8pt; } /* Linha mais larga, fonte menor */
+        .saldo-positivo { color: green; }
+        .saldo-negativo { color: red; }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Espelho de Ponto</h1>
-        <h2>Empresa: <%= empresa.nome %></h2>
-        <h2>Período: <%= dataInicio.toLocaleDateString('pt-BR') %> a <%= dataFim.toLocaleDateString('pt-BR') %></h2>
-    </div>
 
-    <% relatorioAgrupado.forEach(funcionario => { %>
-        <div class="funcionario-bloco">
-            <h3><%= funcionario.nome %></h3>
-            <% if (funcionario.semanas.length > 0) { %>
-                <% funcionario.semanas.forEach(semana => { %>
-                    <% const diasDaSemana = {segunda: 'Segunda', terca: 'Terça', quarta: 'Quarta', quinta: 'Quinta', sexta: 'Sexta'}; %>
-                    <table class="semana-tabela">
-                        <thead>
-                            <tr>
-                                <th>Dia</th>
-                                <th>Data</th>
-                                <th>Registros</th>
-                                <th>Total</th>
-                                <th>Saldo</th>
-                                <th>Observação</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% Object.keys(diasDaSemana).forEach(key => { %>
-                                <% const dia = semana[key]; %>
-                                <tr>
-                                    <td><%= diasDaSemana[key] %></td>
-                                    <% if (dia) { %>
-                                        <td><%= dia.data.toLocaleDateString('pt-BR') %></td>
-                                        <td>
-                                            <ul>
-                                            <% dia.registros.forEach(r => { %>
-                                                <li><strong><%= r.tipo %>:</strong> <%= new Date(r.timestamp).toLocaleTimeString('pt-BR', {timeZone: 'America/Sao_Paulo' }) %></li>
-                                            <% }) %>
-                                            </ul>
-                                        </td>
-                                        <td><%= dia.horasTrabalhadas %></td>
-                                        <td><%= dia.saldoHoras %></td>
-                                        <td><%= dia.observacao %></td>
-                                    <% } else { %>
-                                        <td colspan="5"></td>
-                                    <% } %>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                <% }) %>
-
-                <div class="signature-area">
-                    <div class="signature-line">
-                        Assinatura do Funcionário(a)
-                    </div>
+    <% relatorioAgrupado.forEach((funcionario, index) => { %>
+        <div class="pagina">
+            <div class="header">
+                <div>
+                    <% if (empresa.logoBase64) { %>
+                        <img src="<%= empresa.logoBase64 %>" alt="Logo da Empresa" class="header-logo">
+                    <% } %>
                 </div>
+                <div class="header-info">
+                    <h1>Espelho de Ponto</h1>
+                    <h2>Empresa: <%= empresa.nome %></h2>
+                    <% if (empresa.cnpj) { %>
+                        <h2>CNPJ: <%= empresa.cnpj %></h2>
+                    <% } %>
+                    <h2>Período: <%= new Date(dataInicio + 'T12:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %> a <%= new Date(dataFim + 'T12:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></h2>
+                </div>
+            </div>
 
-            <% } else { %>
-                <p>Nenhum registro encontrado para este funcionário no período.</p>
-            <% } %>
-        </div>
-    <% }) %>
+            <div class="funcionario-bloco">
+                <h3><%= funcionario.nome %></h3>
+                <% if (funcionario.semanas && funcionario.semanas.length > 0) { %>
+                    <% funcionario.semanas.forEach(semana => { %>
+                        <% const diasDaSemana = {segunda: 'Segunda', terca: 'Terça', quarta: 'Quarta', quinta: 'Quinta', sexta: 'Sexta'}; %>
+                        <table class="semana-tabela">
+                            <thead>
+                                <tr>
+                                    <th>Dia</th>
+                                    <th>Data</th>
+                                    <th>Registros</th>
+                                    <th>Total</th>
+                                    <th>Saldo</th>
+                                    <th>Observação</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% Object.keys(diasDaSemana).forEach(key => { %>
+                                    <% const dia = semana[key]; %>
+                                    <tr>
+                                        <td><%= diasDaSemana[key] %></td>
+                                        <% if (dia) { %>
+                                            <td><%= new Date(dia.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
+                                            <td>
+                                                <% if (dia.registros && dia.registros.length > 0) { %>
+                                                    <ul>
+                                                    <% dia.registros.forEach(r => { %>
+                                                         <li><strong><%= r.tipo %>:</strong> <%= new Date(r.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour12: false }) %></li>
+                                                    <% }) %>
+                                                    </ul>
+                                                <% } else { %>
+                                                     - <% } %>
+                                            </td>
+                                            <td style="text-align: center;"><%= dia.horasTrabalhadas %></td>
+                                            <td style="text-align: center;" class="<%= dia.saldoHoras && dia.saldoHoras.startsWith('+') ? 'saldo-positivo' : (dia.saldoHoras && dia.saldoHoras.startsWith('-') ? 'saldo-negativo' : '') %>">
+                                                <%= dia.saldoHoras %>
+                                            </td>
+                                            <td><%= dia.observacao %></td>
+                                        <% } else { %>
+                                            <td></td>
+                                            <td colspan="4" style="background-color: #fdfdfd;"></td> <% } %>
+                                    </tr>
+                                <% }) %>
+                            </tbody>
+                        </table>
+                    <% }) %>
+
+                    <div class="signature-area">
+                        <div class="signature-line">
+                            Assinatura do Funcionário(a)
+                        </div>
+                    </div>
+
+                <% } else { %>
+                    <p style="text-align: center; margin-top: 20px;">Nenhum registro encontrado para este funcionário no período selecionado.</p>
+                     <div class="signature-area" style="margin-top: 50px;">
+                         <div class="signature-line">
+                             Assinatura do Funcionário(a)
+                         </div>
+                     </div>
+                <% } %>
+            </div> </div> <% }) %>
 </body>
 </html>

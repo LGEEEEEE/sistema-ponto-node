@@ -16,6 +16,11 @@
         .switch-link { margin-top: 20px; font-size: 14px; }
         .switch-link a { color: #2980b9; text-decoration: none; font-weight: 600; }
         hr { border: 0; height: 1px; background-color: #eee; margin: 20px 0; }
+        .error-message { color: #c0392b; background-color: #fbeae5; border: 1px solid #c0392b; padding: 10px; border-radius: 5px; margin-bottom: 15px; text-align: left; }
+        /* Estilos para o campo de IP */
+        .ip-info-box { text-align: left; margin-bottom: 15px; font-size: 14px; color: #555; padding: 10px; background-color: #f9f9f9; border: 1px solid #eee; border-radius: 5px;}
+        .ip-info-box label { font-weight: 600; display: block; margin-bottom: 8px; color: #333; }
+        .ip-info-box p { font-size: 13px; margin: 0 0 10px 0; }
     </style>
 </head>
 <body>
@@ -23,14 +28,29 @@
         <h1>Bem-vindo ao Sistema de Ponto!</h1>
         <h2>Cadastre sua empresa e comece a usar.</h2>
 
+        <% if (locals.error) { %>
+            <div class="error-message"><%= error %></div>
+        <% } %>
+
         <form action="/empresa/cadastrar" method="POST">
-            <input class="input-field" type="text" name="nomeEmpresa" placeholder="Nome da Empresa" required>
-            <input class="input-field" type="text" name="cnpj" placeholder="CNPJ (Opcional)">
+            <input class="input-field" type="text" name="nomeEmpresa" placeholder="Nome da Empresa" required value="<%= locals.formData && formData.nomeEmpresa ? formData.nomeEmpresa : '' %>">
+            <input class="input-field" type="text" name="cnpj" placeholder="CNPJ (Opcional)" value="<%= locals.formData && formData.cnpj ? formData.cnpj : '' %>">
 
             <hr>
 
-            <input class="input-field" type="text" name="nomeAdmin" placeholder="Seu Nome Completo (Admin)" required>
-            <input class="input-field" type="email" name="emailAdmin" placeholder="Seu Email (será seu login)" required>
+            <div class="ip-info-box">
+                <label for="allowedIps">IPs Permitidos para Bater Ponto (Obrigatório)</label>
+                <p>
+                    Seu IP público atual é: <strong><%= locals.userIp || 'Não detectado' %></strong>
+                    <br>
+                    Copie este IP se for o principal da empresa. Use vírgula para separar múltiplos IPs.
+                </p>
+                <input class="input-field" id="allowedIps" type="text" name="allowedIps" placeholder="Ex: 200.150.10.1, 189.50.20.5" required value="<%= locals.formData && formData.allowedIps ? formData.allowedIps : '' %>">
+            </div>
+            <hr>
+
+            <input class="input-field" type="text" name="nomeAdmin" placeholder="Seu Nome Completo (Admin)" required value="<%= locals.formData && formData.nomeAdmin ? formData.nomeAdmin : '' %>">
+            <input class="input-field" type="email" name="emailAdmin" placeholder="Seu Email (será seu login)" required value="<%= locals.formData && formData.emailAdmin ? formData.emailAdmin : '' %>">
             <input class="input-field" type="password" name="senhaAdmin" placeholder="Crie uma Senha" required>
 
             <button class="submit-btn" type="submit">Finalizar Cadastro</button>

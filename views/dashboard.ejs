@@ -44,7 +44,16 @@
             border-radius: 4px;
             font-size: 16px;
             margin-top: 10px;
+            transition: background-color 0.2s, opacity 0.2s; /* Add transition */
         }
+
+        /* Style for disabled button */
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background-color: #bdc3c7; /* Grey background */
+        }
+
 
         .btn-ponto {
             background-color: #27ae60;
@@ -52,7 +61,7 @@
             width: 100%;
         }
 
-        .btn-ponto:hover {
+        .btn-ponto:hover:not(:disabled) { /* Only hover effect if not disabled */
             background-color: #229954;
         }
 
@@ -77,15 +86,32 @@
             margin-bottom: 5px;
         }
 
-        .mensagem-erro {
-            color: red;
+        .mensagem-info, .mensagem-erro { /* Combined styles */
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
             font-weight: bold;
         }
 
-        .link-rh {
+        .mensagem-erro {
+            color: #c0392b; /* Red */
+            background-color: #fbeae5;
+        }
+         .mensagem-info {
+            color: #155724; /* Green */
+            background-color: #d4edda;
+         }
+
+
+        .link-rh, .link-relatorio { /* Combine styles */
             margin-top: 15px;
             display: block;
             text-align: center;
+        }
+        .link-relatorio {
+             text-decoration: underline;
+             font-size: 0.9em;
         }
     </style>
 </head>
@@ -95,49 +121,84 @@
         <h1>Ponto Eletrônico</h1>
 
         <% if (locals.user) { %>
-            <p>Olá, <strong>
-                    <%= user.nome %>
-                </strong>!</p>
+            <p>Olá, <strong><%= user.nome %></strong>!</p>
+        <% } %>
+
+        <% if (locals.query && query.mensagem === 'ciclo_finalizado') { %>
+            <p class="mensagem-erro">Você já completou as 4 batidas de ponto do dia!</p>
+        <% } else if (locals.query && query.msg === 'ponto_registrado') { %>
+             <p class="mensagem-info">Ponto registrado com sucesso!</p>
+        <% } %>
+
+        <form id="form-registrar-ponto" action="/registrar" method="POST">
+            <button id="btn-bater-ponto" type="submit" class="btn-ponto">BATER PONTO AGORA</button>
+        </form>
+        <hr>
+
+        <h3>Seus registros de hoje:</h3>
+        <ul class="registros-lista">
+            <% if (registros && registros.length > 0) { %> <%# Adicionado check locals.registros %>
+                <% registros.forEach(registro => { %>
+                    <li><strong><%= registro.tipo %>:</strong>
+                        <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %>
+                    </li>
+                <% }) %>
+            <% } else { %>
+                <li>Nenhum registro hoje.</li>
             <% } %>
+        </ul>
 
-                <% if (locals.query && query.mensagem==='ciclo_finalizado' ) { %>
-                    <p class="mensagem-erro">Você já completou as 4 batidas de ponto do dia!</p>
-                    <% } %>
+        <hr>
 
-                        <form action="/registrar" method="POST">
-                            <button type="submit" class="btn-ponto">BATER PONTO AGORA</button>
-                        </form>
+        <% if (locals.user && user.role === 'rh') { %>
+            <a href="/rh/dashboard" class="link-rh">Acessar Área do RH</a>
+        <% } %>
 
-                        <hr>
+         <a href="/meu-relatorio" class="link-relatorio">Ver meu relatório detalhado</a>
 
-                        <h3>Seus registros de hoje:</h3>
-                        <ul class="registros-lista">
-                            <% if (registros.length> 0) { %>
-                                <% registros.forEach(registro=> { %>
-                                    <li><strong>
-                                            <%= registro.tipo %>:
-                                        </strong>
-                                        <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', {
-                                            timeZone: 'America/Sao_Paulo' }) %>
-                                    </li>
-                                    <% }) %>
-                                        <% } else { %>
-                                            <li>Nenhum registro hoje.</li>
-                                            <% } %>
-                        </ul>
+        <form action="/logout" method="POST" style="margin-top: 15px;">
+            <button type="submit" class="btn-logout">Sair</button>
+        </form>
 
-                        <hr>
-
-                        <% if (locals.user && user.role==='rh' ) { %>
-                            <a href="/rh/dashboard" class="link-rh">Acessar Área do RH</a>
-                            <% } %>
-
-                                <form action="/logout" method="POST" style="margin-top: 15px;">
-                                    <button type="submit" class="btn-logout">Sair</button>
-                                </form>
-                                <a href="/meu-relatorio" class="link-rh" style="text-decoration: underline;">Ver meu
-                                    relatório detalhado</a>
     </div>
-</body>
 
+    <script>
+        const formRegistrar = document.getElementById('form-registrar-ponto');
+        const btnBaterPonto = document.getElementById('btn-bater-ponto');
+        let isSubmitting = false; // Flag para evitar múltiplos envios
+
+        // Verifica se o ciclo já foi finalizado (pela mensagem na URL)
+        const urlParams = new URLSearchParams(window.location.search);
+        const cicloFinalizado = urlParams.get('mensagem') === 'ciclo_finalizado';
+
+        if (cicloFinalizado) {
+            btnBaterPonto.disabled = true; // Desabilita o botão se já bateu 4x
+            btnBaterPonto.textContent = 'CICLO DO DIA FINALIZADO';
+        }
+
+        formRegistrar.addEventListener('submit', function(event) {
+            // 1. Previne o envio padrão imediatamente
+            event.preventDefault();
+
+            // 2. Verifica se já está enviando ou se o botão está desabilitado
+            if (isSubmitting || btnBaterPonto.disabled) {
+                return; // Impede novo envio
+            }
+
+            // 3. Mostra a confirmação
+            const querRegistrar = confirm("Confirmar registro de ponto?");
+
+            // 4. Se confirmado, envia o formulário
+            if (querRegistrar) {
+                isSubmitting = true; // Define a flag
+                btnBaterPonto.disabled = true; // Desabilita o botão visualmente
+                btnBaterPonto.textContent = 'Registrando...'; // Feedback visual
+
+                // Envia o formulário programaticamente
+                formRegistrar.submit();
+            }
+            // Se não confirmar (clicar em Cancelar), não faz nada.
+        });
+    </script>
+     </body>
 </html>

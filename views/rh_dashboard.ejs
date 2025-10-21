@@ -33,6 +33,8 @@
             align-items: center;
             flex-wrap: wrap;
             margin-bottom: 1em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 1em;
         }
 
         .header-nav .actions a {
@@ -47,10 +49,16 @@
             font-size: 14px;
             font-weight: bold;
         }
+        .btn-add:hover { background-color: #2ecc71; }
 
-        .btn-add:hover {
-            background-color: #2ecc71;
+
+        .nav-links {
+             margin-bottom: 25px;
+             padding-bottom: 15px;
+             border-bottom: 1px solid #eee;
         }
+        .nav-links a { margin-right: 15px; font-size: 14px;}
+
 
         .config-box {
             background-color: #fff;
@@ -64,13 +72,16 @@
             display: flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap; /* Para telas menores */
         }
+
+        .config-form label { font-weight: 600; }
 
         .config-form input {
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            width: 80px;
+            width: 80px; /* Tamanho fixo para minutos */
         }
 
         .config-form button {
@@ -81,12 +92,13 @@
             border: none;
             border-radius: 4px;
         }
+         .config-form button:hover { background-color: #2c3e50; }
 
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 20px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); /* Sombra mais suave */
             background-color: #fff;
         }
 
@@ -95,28 +107,35 @@
             border: 1px solid #ddd;
             padding: 12px;
             text-align: left;
-            vertical-align: middle;
+            vertical-align: middle; /* Alinha verticalmente */
         }
 
         th {
             background-color: #f2f2f2;
             font-weight: bold;
+            white-space: nowrap; /* Evita quebra de linha no header */
         }
+
+        /* Melhorias visuais na tabela */
+        tr:nth-child(even) { background-color: #f9f9f9; } /* Listras zebradas suaves */
+        td small { color: #555; font-size: 0.85em; }
 
         .ferias-lista {
             list-style-type: none;
             padding: 0;
-            margin: 10px 0 0 0;
+            margin: 10px 0 0 0; /* Ajuste margem */
             font-size: 0.9em;
-            max-height: 100px;
+            max-height: 80px; /* Reduz altura max */
             overflow-y: auto;
         }
 
         .ferias-lista li {
-            background-color: #eafaf1;
-            padding: 5px;
+            background-color: #eafaf1; /* Verde claro */
+            padding: 4px 8px; /* Ajuste padding */
             border-radius: 3px;
-            margin-bottom: 5px;
+            margin-bottom: 4px; /* Espaçamento menor */
+            border: 1px solid #b
+aded; /* Borda sutil */
         }
 
         .ferias-form {
@@ -126,44 +145,69 @@
             align-items: flex-start;
         }
 
-        .ferias-form div {
-            display: flex;
-            gap: 5px;
-            align-items: center;
-        }
+        .ferias-form div { display: flex; gap: 5px; align-items: center; }
+        .ferias-form input { width: 125px; padding: 6px; } /* Ajuste padding input data */
+        .ferias-form button { padding: 6px 12px; font-size: 13px;} /* Botão menor */
 
-        .ferias-form input {
-            width: 125px;
-        }
 
-        /* --- ESTILO ADICIONADO PARA O BOTÃO EDITAR --- */
-        .btn-edit {
-            background-color: #f39c12;
-            color: white;
-            padding: 8px 12px;
+        .form-horario {
+             display: flex; gap: 5px; align-items: center;
+        }
+         .form-horario input { width: 80px; padding: 6px; }
+         .form-horario button { padding: 6px 12px; font-size: 13px;}
+
+        /* Estilos botões de ação */
+        .action-buttons div { margin-bottom: 5px; } /* Espaço entre linhas de botões */
+        .btn-action {
+            padding: 6px 10px; /* Botões menores */
             border-radius: 4px;
-            font-size: 14px;
+            font-size: 13px; /* Fonte menor */
+            text-decoration: none;
             text-align: center;
-            display: inline-block;
-        }
-
-        .btn-edit:hover {
-            background-color: #e67e22;
-        }
-
-        .btn-delete {
-            background-color: #e74c3c;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 4px;
-            font-size: 14px;
+            color: white !important; /* Força cor branca no link */
             border: none;
             cursor: pointer;
+            display: inline-block;
+            margin-right: 5px; /* Espaço entre botões na mesma linha */
+            min-width: 60px; /* Largura mínima */
+        }
+        .btn-action:last-child { margin-right: 0; }
+
+        .btn-edit { background-color: #f39c12; }
+        .btn-edit:hover { background-color: #e67e22; }
+
+        .btn-delete { background-color: #e74c3c; }
+        .btn-delete:hover { background-color: #c0392b; }
+
+        .btn-lancamento-manual {
+            background-color: #3498db;
+             display: block; /* Ocupa largura toda */
+             width: calc(100% - 10px); /* Ajusta largura com margem */
+             margin-top: 5px;
+        }
+        .btn-lancamento-manual:hover { background-color: #2980b9; }
+
+        /* Estilo para excluir registro individual */
+        .registro-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+        .btn-excluir-registro {
+            background: none; border: none; color: #c0392b; cursor: pointer;
+            font-size: 11px; padding: 0 2px; text-decoration: underline; margin-left: 5px;
+        }
+        .btn-excluir-registro:hover { color: #e74c3c; }
+
+
+        .status-atrasado {
+            font-weight: bold; color: #e74c3c; background-color: #f9e5e3;
+            padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px; font-size: 0.85em;
         }
 
-        .btn-delete:hover {
-            background-color: #c0392b;
+        /* Mensagens de feedback (opcional) */
+        .feedback-message {
+             padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; text-align: center;
         }
+        .feedback-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .feedback-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+
     </style>
 </head>
 
@@ -171,27 +215,41 @@
     <div class="header-nav">
         <div>
             <h1>Dashboard do RH</h1>
-            <h2>Hoje é: <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long' , year: 'numeric' , month: 'long' ,
-                    day: 'numeric' }) %>
-            </h2>
+            <h2>Hoje é: <%= new Date().toLocaleDateString('pt-BR', { weekday: 'long' , year: 'numeric' , month: 'long' , day: 'numeric' }) %></h2>
         </div>
         <div class="actions">
             <a href="/cadastro" class="btn-add">Adicionar Funcionário</a>
         </div>
     </div>
 
-    <p>
+    <div class="nav-links">
         <a href="/dashboard">← Voltar para minha dashboard</a> |
         <a href="/rh/relatorios">Relatório de Faltas</a> |
-        <a href="/rh/relatorios/folha-ponto">Folha de Ponto Detalhada</a>
-    </p>
+        <a href="/rh/relatorios/folha-ponto">Folha de Ponto Semanal</a> |
+        <a href="/rh/empresa/editar">Dados da Empresa</a> </div>
 
-    <div class="config-box">
+     <% if (locals.query && query.msg === 'func_cadastrado') { %>
+        <div class="feedback-message feedback-success">Funcionário cadastrado com sucesso!</div>
+     <% } else if (locals.query && query.msg === 'func_excluido') { %>
+        <div class="feedback-message feedback-success">Funcionário excluído com sucesso!</div>
+     <% } else if (locals.query && query.msg === 'func_editado') { %>
+        <div class="feedback-message feedback-success">Dados do funcionário atualizados!</div>
+     <% } else if (locals.query && query.msg === 'horario_definido') { %>
+        <div class="feedback-message feedback-success">Horário padrão salvo!</div>
+     <% } else if (locals.query && query.msg === 'ferias_agendadas') { %>
+        <div class="feedback-message feedback-success">Férias agendadas com sucesso!</div>
+     <% } else if (locals.query && query.msg === 'config_salva') { %>
+        <div class="feedback-message feedback-success">Configuração salva!</div>
+     <% } else if (locals.query && query.msg === 'registro_excluido') { %>
+        <div class="feedback-message feedback-success">Registro de ponto excluído.</div>
+     <% } else if (locals.query && query.msg === 'registro_manual_ok') { %>
+        <div class="feedback-message feedback-success">Registros manuais salvos com sucesso!</div>
+     <% } %>
+     <div class="config-box">
         <h2>Configurações Gerais</h2>
         <form action="/rh/configuracoes" method="POST" class="config-form">
-            <label for="duracaoAlmocoMinutos">Duração Padrão do Almoço (em minutos):</label>
-            <input type="number" name="duracaoAlmocoMinutos" id="duracaoAlmocoMinutos" value="<%= duracaoAlmocoAtual %>"
-                min="0" required>
+            <label for="duracaoAlmocoMinutos">Duração Padrão do Almoço (minutos):</label>
+            <input type="number" name="duracaoAlmocoMinutos" id="duracaoAlmocoMinutos" value="<%= duracaoAlmocoAtual %>" min="0" required>
             <button type="submit">Salvar Configuração</button>
         </form>
     </div>
@@ -200,151 +258,129 @@
         <thead>
             <tr>
                 <th>Funcionário</th>
-                <th>Expediente de Hoje</th>
-                <th>Registros de Hoje</th>
-                <th>Status / Horas Trabalhadas</th>
-                <th>Definir Horário Padrão</th>
+                <th>Expediente Hoje</th>
+                <th>Registros Hoje</th>
+                <th>Status / Horas</th>
+                <th>Horário Padrão</th>
                 <th>Férias</th>
                 <th>Ações</th>
             </tr>
         </thead>
         <tbody>
-            <% if (usuarios.length> 0) { %>
-                <% usuarios.forEach(usuario=> { %>
+            <% if (usuarios.length > 0) { %>
+                <% usuarios.forEach(usuario => { %>
                     <tr>
                         <td>
-                            <strong>
-                                <%= usuario.nome %>
-                            </strong>
-                            <br>
-                            <small style="color: #555;">
-                                <%= usuario.email %>
-                            </small>
+                            <strong><%= usuario.nome %></strong><br>
+                            <small><%= usuario.email %></small>
                         </td>
                         <td>
-                            <% const expediente=expedientes[usuario.id]; %>
-                                <% if (expediente) { %>
-                                    <span>
-                                        <%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %>
-                                    </span>
-                                    <% if (new Date().getDay()===5) { %>
-                                        <div style="font-size: 0.8em; color: #27ae60;">(horário de sexta-feira)</div>
-                                        <% } %>
-                                            <% } else { %>
-                                                Não definido
-                                                <% } %>
+                            <% const expediente = expedientes[usuario.id]; %>
+                            <% if (expediente && expediente.entrada && expediente.saida) { %>
+                                <span><%= expediente.entrada.slice(0, 5) %> - <%= expediente.saida.slice(0, 5) %></span>
+                                <% if (new Date().getDay() === 5) { %>
+                                     <div style="font-size: 0.8em; color: #27ae60;">(Sexta)</div>
+                                <% } %>
+                            <% } else { %>
+                                Não definido
+                            <% } %>
                         </td>
                         <td>
-                            <% const registrosDoUsuario=registros[usuario.id] || []; %>
-                                <% if (registrosDoUsuario.length> 0) { %>
-                                    <ul style="list-style-type: none; padding: 0; margin: 0;">
-                                        <% registrosDoUsuario.forEach(registro=> { %>
-                                            <li
-                                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; padding: 2px 0;">
-                                                <span>
-                                                    <strong>
-                                                        <%= registro.tipo %>:
-                                                    </strong>
-                                                    <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', {
-                                                        timeZone: 'America/Sao_Paulo' }) %>
-                                                </span>
-
-                                                <form action="/rh/registro/excluir/<%= registro.id %>" method="POST"
-                                                    style="display: inline; margin-left: 10px;">
-                                                    <button type="submit"
-                                                        onclick="return confirm('Tem certeza que deseja excluir esta batida?');"
-                                                        style="background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 14px; padding: 2px; text-decoration: underline;">
-                                                        Excluir
-                                                    </button>
-                                                </form>
-                                            </li>
-                                            <% }) %>
-                                    </ul>
-                                    <% } else { %>
-                                        Nenhum registro hoje.
-                                        <% } %>
+                            <% const registrosDoUsuario = registros[usuario.id] || []; %>
+                            <% if (registrosDoUsuario.length > 0) { %>
+                                <ul style="list-style-type: none; padding: 0; margin: 0; font-size: 0.9em;">
+                                    <% registrosDoUsuario.forEach(registro => { %>
+                                        <li class="registro-item">
+                                            <span><strong><%= registro.tipo %>:</strong> <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %></span>
+                                            <form action="/rh/registro/excluir/<%= registro.id %>" method="POST" style="display: inline;">
+                                                <button type="submit" class="btn-excluir-registro" onclick="return confirm('Tem certeza que deseja excluir esta batida?');">Excluir</button>
+                                            </form>
+                                        </li>
+                                    <% }) %>
+                                </ul>
+                            <% } else { %>
+                                Nenhum registro hoje.
+                            <% } %>
                         </td>
                         <td>
-                            <% const registroEntrada=registrosDoUsuario.find(r=> r.tipo === 'Entrada'); if
-                                (registroEntrada && expediente) {
-                                const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}`);
-                                const horaEntradaReal = new Date(registroEntrada.timestamp);
-                                if (horaEntradaReal.getHours() > horaEntradaEsperada.getHours() ||
-                                (horaEntradaReal.getHours() === horaEntradaEsperada.getHours() &&
-                                horaEntradaReal.getMinutes() > horaEntradaEsperada.getMinutes())) {
-                                %>
-                                <span
-                                    style="font-weight: bold; color: #e74c3c; background-color: #f9e5e3; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 5px;">Atrasado</span>
-                                <% } } %>
-                                    <div><strong>Total:</strong>
-                                        <%= horas[usuario.id] %>
-                                    </div>
+                            <%
+                            const registroEntrada = registrosDoUsuario.find(r => r.tipo === 'Entrada');
+                            let atrasado = false;
+                            if (registroEntrada && expediente && expediente.entrada) {
+                                try {
+                                    const horaEntradaEsperada = new Date(`1970-01-01T${expediente.entrada}-03:00`); // Define fuso
+                                    const horaEntradaReal = new Date(registroEntrada.timestamp);
+                                    // Compara minutos totais do dia para evitar problemas com virada de hora
+                                    const minutosEsperados = horaEntradaEsperada.getUTCHours() * 60 + horaEntradaEsperada.getUTCMinutes();
+                                    const minutosReais = horaEntradaReal.getHours() * 60 + horaEntradaReal.getMinutes();
+                                    if (minutosReais > minutosEsperados) {
+                                        atrasado = true;
+                                    }
+                                } catch (e) { console.error("Erro ao verificar atraso:", e); }
+                            }
+                            %>
+                            <% if (atrasado) { %>
+                                <span class="status-atrasado">Atrasado</span>
+                            <% } %>
+                            <div><strong>Total:</strong> <%= horas[usuario.id] %></div>
                         </td>
                         <td>
-                            <form action="/rh/definir-horario/<%= usuario.id %>" method="POST"
-                                style="display: flex; gap: 5px; align-items: center;">
-                                <input type="time" name="horarioEntrada" value="<%= usuario.horarioEntrada || '' %>"
-                                    required>
-                                <input type="time" name="horarioSaida" value="<%= usuario.horarioSaida || '' %>"
-                                    required>
+                            <form action="/rh/definir-horario/<%= usuario.id %>" method="POST" class="form-horario">
+                                <input type="time" name="horarioEntrada" value="<%= usuario.horarioEntrada || '' %>" required>
+                                <span>-</span>
+                                <input type="time" name="horarioSaida" value="<%= usuario.horarioSaida || '' %>" required>
                                 <button type="submit">Salvar</button>
                             </form>
                         </td>
                         <td>
-                            <form action="/rh/ferias/agendar" method="POST"
-                                style="display: flex; flex-direction: column; gap: 5px; align-items: flex-start;">
+                            <form action="/rh/ferias/agendar" method="POST" class="ferias-form">
                                 <input type="hidden" name="funcionarioId" value="<%= usuario.id %>">
-                                <div style="display: flex; gap: 5px; align-items: center;">
-                                    <input type="date" name="dataInicio" required title="Data de início das férias">
+                                <div>
+                                    <input type="date" name="dataInicio" required title="Data de início">
                                     <span>até</span>
-                                    <input type="date" name="dataFim" required title="Data de fim das férias">
+                                    <input type="date" name="dataFim" required title="Data de fim">
                                 </div>
-                                <button type="submit">Agendar Férias</button>
+                                <button type="submit">Agendar</button>
                             </form>
                             <ul class="ferias-lista">
-                                <% const feriasDoUsuario=ferias[usuario.id] || []; %>
-                                    <% if (feriasDoUsuario.length> 0) { %>
-                                        <% feriasDoUsuario.forEach(f=> { %>
-                                            <li>
-                                                <%= new Date(f.dataInicio + 'T12:00:00' ).toLocaleDateString('pt-BR') %>
-                                                    até
-                                                    <%= new Date(f.dataFim + 'T12:00:00' ).toLocaleDateString('pt-BR')
-                                                        %>
-                                            </li>
-                                            <% }) %>
-                                                <% } else { %>
-                                                    <li>Nenhuma férias agendada.</li>
-                                                    <% } %>
+                                <% const feriasDoUsuario = ferias[usuario.id] || []; %>
+                                <% if (feriasDoUsuario.length > 0) { %>
+                                    <% feriasDoUsuario.forEach(f => { %>
+                                        <li>
+                                            <%= new Date(f.dataInicio + 'T12:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %>
+                                            até
+                                            <%= new Date(f.dataFim + 'T12:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %>
+                                        </li>
+                                    <% }) %>
+                                <% } else { %>
+                                    <li>Nenhuma férias.</li>
+                                <% } %>
                             </ul>
                         </td>
-                        <td style="min-width: 210px;">
-                            <div>
-                                <a href="/rh/funcionario/editar/<%= usuario.id %>" class="btn-edit"
-                                    style="margin-right: 5px; margin-bottom: 5px;">Editar</a>
-                                <form action="/rh/funcionario/excluir/<%= usuario.id %>" method="POST"
-                                    style="display: inline;">
-                                    <button type="submit" class="btn-delete"
-                                        onclick="return confirm('Tem certeza que deseja excluir este funcionário? Esta ação não pode ser desfeita.');">
+                        <td class="action-buttons">
+                             <div>
+                                <a href="/rh/funcionario/editar/<%= usuario.id %>" class="btn-action btn-edit">Editar</a>
+                                <form action="/rh/funcionario/excluir/<%= usuario.id %>" method="POST" style="display: inline;">
+                                    <button type="submit" class="btn-action btn-delete" onclick="return confirm('Tem certeza que deseja excluir este funcionário? TODOS os registros dele serão perdidos.');">
                                         Excluir
                                     </button>
                                 </form>
                             </div>
                             <div>
-                                <a href="/rh/registro-manual/<%= usuario.id %>"
-                                    style="background-color: #3498db; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; text-align: center; display: inline-block; margin-top: 8px;">
+                                <a href="/rh/registro-manual/<%= usuario.id %>" class="btn-action btn-lancamento-manual">
                                     Lançamento Manual
                                 </a>
                             </div>
                         </td>
                     </tr>
-                    <% }) %>
-                        <% } else { %>
-                            <tr>
-                                <td colspan="7" style="text-align: center;">Nenhum funcionário cadastrado.</td>
-                            </tr>
-                            <% } %>
+                <% }) %>
+            <% } else { %>
+                <tr>
+                    <td colspan="7" style="text-align: center;">Nenhum funcionário cadastrado. Adicione um clicando no botão "Adicionar Funcionário".</td>
+                </tr>
+            <% } %>
         </tbody>
     </table>
-</body>
 
+</body>
 </html>

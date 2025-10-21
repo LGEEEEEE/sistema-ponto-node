@@ -20,12 +20,14 @@
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "express-session": "^1.18.2",
+    "multer": "^2.0.2",
     "pg": "^8.16.3",
     "puppeteer-core": "^24.19.0",
     "sequelize": "^6.37.7",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "nodemon": "^3.1.10",
+    "puppeteer": "^24.26.0"
   }
 }
