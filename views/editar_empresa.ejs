@@ -9,20 +9,23 @@
         h1 { text-align: center; color: #2c3e50; margin-bottom: 25px;}
         .form-group { margin-bottom: 20px; }
         .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #555;}
-        .form-group input { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; }
-        .form-group input:focus { outline: none; border-color: #2980b9; }
+        .form-group input, .form-group textarea { width: 100%; padding: 12px 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 16px; font-family: inherit; }
+        .form-group input:focus, .form-group textarea:focus { outline: none; border-color: #2980b9; }
+        .form-group textarea { min-height: 80px; resize: vertical; font-size: 14px; } /* Estilo para textarea */
         .logo-preview { display: block; max-width: 150px; max-height: 150px; margin: 10px auto; border: 1px solid #ddd; padding: 5px; border-radius: 5px; object-fit: contain;}
         .btn, .cancel-btn { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; text-decoration: none; text-align: center; display: block; width: 100%; box-sizing: border-box; transition: background-color 0.2s; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; opacity: 0.7; }
         .btn-primary { background-color: #2980b9; color: white; margin-top: 10px; }
-        .btn-primary:hover { background-color: #3498db; }
+        .btn-primary:hover:not(:disabled) { background-color: #3498db; }
         .btn-secondary { background-color: #95a5a6; color: white; margin-top: 10px; margin-bottom: 20px; }
-        .btn-secondary:hover { background-color: #7f8c8d; }
+        .btn-secondary:hover:not(:disabled) { background-color: #7f8c8d; }
         .cancel-btn { background-color: #f1f1f1; color: #333; margin-top: 30px; }
         .cancel-btn:hover { background-color: #e1e1e1; }
         .upload-area { text-align: center; margin-bottom: 20px; border: 1px dashed #ccc; padding: 15px; border-radius: 5px; background-color: #f9f9f9;}
-        #message { text-align: center; margin-bottom: 15px; font-weight: bold; padding: 10px; border-radius: 5px; display: none; /* Só mostra quando tem msg */}
+        #message { text-align: center; margin-bottom: 15px; font-weight: bold; padding: 10px; border-radius: 5px; display: none; }
         .success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; display: block !important; }
         .error { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; display: block !important; }
+        .form-group small { color: #666; font-size: 0.8em; display: block; margin-top: 5px;} /* Estilo para a dica */
     </style>
 </head>
 <body>
@@ -46,6 +49,12 @@
                 <label for="cnpj">CNPJ</label>
                 <input id="cnpj" type="text" placeholder="Opcional">
             </div>
+
+            <div class="form-group">
+                <label for="allowedIps">IPs Permitidos para Bater Ponto</label>
+                <textarea id="allowedIps" placeholder="Um IP por linha ou separados por vírgula. Ex:&#10;192.168.1.1&#10;200.10.20.5, 201.30.40.6"></textarea>
+                 <small>Deixe em branco para desativar a restrição de IP.</small>
+            </div>
             <button class="btn btn-primary" type="submit">Salvar Alterações</button>
         </form>
 
@@ -59,110 +68,77 @@
         const logoPreview = document.getElementById('logoPreview');
         const messageDiv = document.getElementById('message');
         const formEditEmpresa = document.getElementById('formEditEmpresa');
-        const uploadButton = document.querySelector('.btn-secondary'); // Botão Trocar Logo
+        const uploadButton = document.querySelector('.btn-secondary');
+        const allowedIpsInput = document.getElementById('allowedIps'); // <-- Textarea de IPs
 
         // Função para exibir mensagens
         function showMessage(text, isError = false) {
             messageDiv.textContent = text;
             messageDiv.className = isError ? 'error' : 'success';
-             // Limpa após 5 segundos
-            setTimeout(() => {
-                messageDiv.textContent = '';
-                messageDiv.className = '';
-            } , 5000);
+            setTimeout(() => { messageDiv.textContent = ''; messageDiv.className = ''; }, 5000);
         }
 
-        // Carregar dados da empresa ao abrir a página
+        // Carregar dados da empresa
         async function loadEmpresaData() {
             try {
                 const response = await fetch('/rh/empresa/dados');
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
 
-                if (data.success) {
+                if (data.success && data.empresa) { // Verifica se data.empresa existe
                     nomeInput.value = data.empresa.nome || '';
                     cnpjInput.value = data.empresa.cnpj || '';
+                    allowedIpsInput.value = data.empresa.allowedIps || ''; // Popula campo de IP
                     if (data.empresa.logoPath) {
                         logoPreview.src = data.empresa.logoPath + '?t=' + new Date().getTime(); // Cache busting
                     } else {
                         logoPreview.src = '/placeholder.png'; // Imagem padrão
                     }
                 } else {
-                    showMessage(data.message || 'Falha ao carregar dados.', true);
+                    showMessage(data.message || 'Falha ao carregar dados da empresa.', true);
                 }
             } catch (error) {
-                console.error("Fetch error:", error);
+                console.error("Fetch error loadEmpresaData:", error);
                 showMessage('Erro de conexão ao carregar dados da empresa.', true);
             }
         }
 
-        // Event listener para quando um arquivo de logo for selecionado
+        // Event listener para upload da logo
         logoInput.addEventListener('change', async (event) => {
             const file = event.target.files[0];
             if (!file) return;
-
-            // Desabilita botão durante upload
-            uploadButton.disabled = true;
-            uploadButton.textContent = 'Enviando...';
-
-            const formData = new FormData();
-            formData.append('logoEmpresa', file);
-
+            uploadButton.disabled = true; uploadButton.textContent = 'Enviando...';
+            const formData = new FormData(); formData.append('logoEmpresa', file);
             try {
-                const response = await fetch('/rh/empresa/logo', {
-                    method: 'POST',
-                    body: formData
-                    // Não precisa de Content-Type, o browser define com FormData
-                });
-
-                const data = await response.json(); // Tenta parsear JSON mesmo em erro
-
+                const response = await fetch('/rh/empresa/logo', { method: 'POST', body: formData });
+                const data = await response.json();
                 if (response.ok && data.success) {
                     showMessage(data.message || 'Logo atualizada!');
-                    logoPreview.src = data.filePath + '?t=' + new Date().getTime(); // Cache busting
-                } else {
-                     // Usa a mensagem do servidor se disponível, senão uma genérica
-                    showMessage(data.message || `Erro ${response.status}: Falha no upload.`, true);
-                }
-            } catch (error) {
-                 console.error("Upload fetch error:", error);
-                showMessage('Erro de conexão ao fazer upload da logo.', true);
-            } finally {
-                 // Reabilita o botão
-                uploadButton.disabled = false;
-                uploadButton.textContent = 'Trocar Logo';
-                logoInput.value = ''; // Limpa o input de arquivo para permitir reenviar o mesmo
-            }
+                    logoPreview.src = data.filePath + '?t=' + new Date().getTime();
+                } else { showMessage(data.message || `Erro ${response.status}: Falha no upload.`, true); }
+            } catch (error) { console.error("Upload fetch error:", error); showMessage('Erro de conexão ao fazer upload.', true); }
+            finally { uploadButton.disabled = false; uploadButton.textContent = 'Trocar Logo'; logoInput.value = ''; }
         });
 
-        // Event listener para salvar nome e CNPJ
+        // Event listener para salvar dados (Nome, CNPJ, IPs)
         formEditEmpresa.addEventListener('submit', async (event) => {
             event.preventDefault();
             const nome = nomeInput.value;
             const cnpj = cnpjInput.value;
+            const allowedIps = allowedIpsInput.value; // Pega valor dos IPs
             const saveButton = formEditEmpresa.querySelector('button[type="submit"]');
 
-            saveButton.disabled = true;
-            saveButton.textContent = 'Salvando...';
-
+            saveButton.disabled = true; saveButton.textContent = 'Salvando...';
             try {
                 const response = await fetch('/rh/empresa/editar', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nome, cnpj })
+                    body: JSON.stringify({ nome, cnpj, allowedIps }) // Envia IPs no corpo
                 });
-
-                 const data = await response.json(); // Tenta parsear JSON
-
+                const data = await response.json();
                 showMessage(data.message || (response.ok ? 'Salvo com sucesso!' : `Erro ${response.status}`), !response.ok);
-
-            } catch (error) {
-                console.error("Save fetch error:", error);
-                showMessage('Erro de conexão ao salvar dados da empresa.', true);
-            } finally {
-                 saveButton.disabled = false;
-                 saveButton.textContent = 'Salvar Alterações';
-            }
+            } catch (error) { console.error("Save fetch error:", error); showMessage('Erro de conexão ao salvar.', true); }
+            finally { saveButton.disabled = false; saveButton.textContent = 'Salvar Alterações'; }
         });
 
         // Carrega os dados ao iniciar

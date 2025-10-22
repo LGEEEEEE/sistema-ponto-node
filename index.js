@@ -1,3 +1,4 @@
+
 // =================================================================
 // IMPORTS E CONFIGURAÇÕES INICIAIS
 // =================================================================
@@ -190,47 +191,54 @@ async function checarAutorizacaoRH(req, res, next) {
 }
 
 // --- FUNÇÃO RESTRINGIR POR IP MODIFICADA ---
+// --- FUNÇÃO RESTRINGIR POR IP (COM MENSAGEM AMIGÁVEL VIA RENDER) ---
 async function restringirPorIP(req, res, next) {
     try {
         const empresaId = req.session.empresaId;
         if (!empresaId) {
-            // Se não tem empresaId na sessão, é provável que não esteja autenticado
-            // ou a sessão expirou bem no meio. Redirecionar para login é mais seguro.
-            console.warn("Tentativa de bater ponto sem empresaId na sessão.");
-            return res.redirect('/login?erro=sessao_expirada');
+            console.warn("Middleware restringirPorIP chamado sem empresaId na sessão.");
+            // Redireciona para login com mensagem clara
+            return res.redirect('/login?erro=sessao_invalida');
         }
 
-        // Busca a configuração de IP específica desta empresa
         const configIp = await Configuracao.findOne({
             where: { chave: 'allowed_ips', EmpresaId: empresaId }
         });
 
-        // Se não houver configuração de IP OU se o valor for vazio/nulo, permite o acesso.
-        // Isso permite desativar a restrição deixando o campo vazio.
+        // Se não há configuração de IP ou está vazia, permite o acesso
         if (!configIp || !configIp.valor || configIp.valor.trim() === '') {
-            return next(); // Permite acesso se não houver IPs configurados
+            return next();
         }
 
-        const allowedIps = (configIp.valor || '').split(',');
-        const userIp = req.ip;
+        const allowedIps = configIp.valor.split(',').map(ip => ip.trim()).filter(ip => ip); // Limpa e filtra IPs vazios
+        const userIp = req.ip; // Confia no 'trust proxy'
+        const devIps = ['::1', '127.0.0.1']; // IPs locais para desenvolvimento
 
-        // IPs locais para desenvolvimento
-        const devIps = ['::1', '127.0.0.1'];
+        console.log(`Verificando IP: ${userIp} contra a lista [${allowedIps.join(', ')}] para Empresa ${empresaId}`); // Log para debug
 
-        // Limpa espaços em branco
-        const ipListLimpa = allowedIps.map(ip => ip.trim()).filter(ip => ip); // Filtra strings vazias
-
-        if (ipListLimpa.includes(userIp) || (process.env.NODE_ENV !== 'production' && devIps.includes(userIp))) {
-            next();
+        // Verifica se o IP está na lista OU se é IP de dev em ambiente não-produção
+        if (allowedIps.includes(userIp) || (process.env.NODE_ENV !== 'production' && devIps.includes(userIp))) {
+            next(); // IP Permitido
         } else {
-            console.log(`Acesso negado por IP: ${userIp} não está na lista [${ipListLimpa.join(', ')}] para empresa ${empresaId}`);
-            res.status(403).send(`Acesso negado. Seu IP (${userIp}) não está autorizado para bater ponto.`);
+            // IP não permitido
+            console.warn(`ACESSO NEGADO POR IP: ${userIp} não permitido para Empresa ${empresaId}. Permitidos: [${allowedIps.join(', ')}]`);
+            // Renderiza a página de erro amigável
+            res.status(403).render('erro_generico', {
+                titulo: 'Acesso Negado por Rede',
+                mensagem: `Registro de ponto não permitido a partir desta localização (${userIp}). Por favor, utilize a rede configurada pela empresa. Se acredita que isso é um erro, contate o RH.`,
+                voltarLink: '/dashboard' // Link para voltar ao dashboard do funcionário
+            });
         }
     } catch (error) {
-        console.error("Erro ao verificar restrição de IP:", error);
-        res.status(500).send('Erro interno ao verificar permissão de IP.');
+        console.error("Erro CRÍTICO ao verificar restrição de IP:", error);
+        res.status(500).render('erro_generico', {
+            titulo: 'Erro Interno',
+            mensagem: 'Falha ao verificar permissão de acesso pela rede. Tente novamente mais tarde.',
+            voltarLink: '/dashboard'
+        });
     }
 }
+// --- FIM FUNÇÃO RESTRINGIR POR IP ---
 // --- FIM DA MODIFICAÇÃO ---
 
 function calcularHorasTrabalhadas(registros) {
@@ -724,16 +732,34 @@ app.get('/rh/empresa/editar', checarAutenticacao, checarAutorizacaoRH, (req, res
     res.render('editar_empresa'); // Renderiza a nova view
 });
 
+// ROTA PARA OBTER DADOS DA EMPRESA (MODIFICADA PARA INCLUIR IPs)
 app.get('/rh/empresa/dados', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
     try {
         const empresaId = req.session.empresaId;
-        const empresa = await Empresa.findByPk(empresaId, {
-            attributes: ['nome', 'cnpj', 'logoPath']
-        });
+        // Busca a empresa E a configuração de IP em paralelo
+        const [empresa, configIp] = await Promise.all([
+            Empresa.findByPk(empresaId, {
+                attributes: ['nome', 'cnpj', 'logoPath']
+            }),
+            Configuracao.findOne({
+                where: { chave: 'allowed_ips', EmpresaId: empresaId },
+                attributes: ['valor'] // Pega só o valor (os IPs)
+            })
+        ]);
+
         if (!empresa) {
             return res.status(404).json({ success: false, message: 'Empresa não encontrada.' });
         }
-        res.json({ success: true, empresa });
+        res.json({
+            success: true,
+            empresa: {
+                nome: empresa.nome,
+                cnpj: empresa.cnpj,
+                logoPath: empresa.logoPath,
+                // Adiciona os IPs (ou string vazia se não encontrado)
+                allowedIps: configIp ? configIp.valor : ''
+            }
+        });
     } catch (error) {
         console.error("Erro ao buscar dados da empresa:", error);
         res.status(500).json({ success: false, message: 'Erro ao carregar dados.' });
@@ -792,27 +818,50 @@ app.post('/rh/empresa/logo', checarAutenticacao, checarAutorizacaoRH, (req, res)
     });
 });
 
+// ROTA PARA EDITAR DADOS (Nome, CNPJ e IPs) - MODIFICADA
 app.post('/rh/empresa/editar', checarAutenticacao, checarAutorizacaoRH, async (req, res) => {
-    // Validação básica dos dados recebidos (precisa de express.json() middleware)
-    if (!req.is('application/json')) {
-        return res.status(400).json({ success: false, message: 'Tipo de conteúdo inválido. Esperado application/json.' });
-    }
-
+    // O middleware express.json() já está global, não precisa aqui
     try {
-        const { nome, cnpj } = req.body;
+        // Adiciona allowedIps na desestruturação
+        const { nome, cnpj, allowedIps } = req.body;
         const empresaId = req.session.empresaId;
 
         if (!nome || nome.trim() === '') {
             return res.status(400).json({ success: false, message: 'O nome da empresa não pode ser vazio.' });
         }
+        // Validação básica de IPs (não valida formato, apenas se existe)
+        if (allowedIps === undefined || allowedIps === null) {
+            // Considera string vazia como válida (para desativar restrição)
+            // Se fosse obrigatório, a validação seria diferente
+            // return res.status(400).json({ success: false, message: 'O campo IPs Permitidos deve ser enviado.' });
+        }
 
 
-        await Empresa.update({ nome, cnpj }, { where: { id: empresaId } });
-        res.json({ success: true, message: 'Dados atualizados!' });
+        // Usa transação para garantir atomicidade
+        const t = await sequelize.transaction();
+        try {
+            // Atualiza nome e CNPJ na tabela Empresa
+            await Empresa.update({ nome, cnpj }, { where: { id: empresaId }, transaction: t });
+
+            // Atualiza (ou cria) a configuração de IPs na tabela Configuracao
+            await Configuracao.upsert({
+                chave: 'allowed_ips',
+                valor: (allowedIps || '').trim(), // Usa string vazia se for null/undefined e remove espaços
+                EmpresaId: empresaId
+            }, { transaction: t });
+
+            await t.commit(); // Confirma as alterações
+            res.json({ success: true, message: 'Dados atualizados com sucesso!' });
+
+        } catch (innerError) {
+            await t.rollback(); // Desfaz alterações se algo der errado
+            throw innerError; // Re-lança o erro para o catch externo
+        }
+
     } catch (error) {
         console.error("Erro ao editar dados da empresa:", error);
         let message = 'Erro ao salvar alterações.';
-        if (error.name === 'SequelizeUniqueConstraintError' && error.fields.cnpj) {
+        if (error.name === 'SequelizeUniqueConstraintError' && error.fields && error.fields.cnpj) {
             message = 'Erro: Este CNPJ já está cadastrado por outra empresa.';
         }
         res.status(500).json({ success: false, message: message });
@@ -1412,9 +1461,9 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
         const dataInicioObj = new Date(`${dataInicio}T00:00:00-03:00`);
         const dataFimObj = new Date(`${dataFim}T23:59:59-03:00`);
 
-         if (isNaN(dataInicioObj) || isNaN(dataFimObj)) {
+        if (isNaN(dataInicioObj) || isNaN(dataFimObj)) {
             return res.status(400).send("Datas fornecidas são inválidas.");
-         }
+        }
 
 
         // --- LÓGICA DE BUSCA E PROCESSAMENTO (Idêntica à rota GET /rh/relatorios/folha-ponto) ---
@@ -1428,7 +1477,7 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
         }
 
         if (funcionariosParaProcessar.length === 0) {
-             let msg = funcionarioId === 'todos' ? "Nenhum funcionário na empresa." : "Funcionário não encontrado.";
+            let msg = funcionarioId === 'todos' ? "Nenhum funcionário na empresa." : "Funcionário não encontrado.";
             return res.status(404).send(msg);
         }
 
@@ -1463,15 +1512,15 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
                     observacao: ''
                 };
 
-                 if (diaDaSemana === 0 || diaDaSemana === 6) { // Fim de semana
-                     diaInfo.observacao = 'Fim de semana';
-                     diaInfo.horasTrabalhadas = '-'; diaInfo.saldoHoras = '-';
-                 } else { // Dia útil
+                if (diaDaSemana === 0 || diaDaSemana === 6) { // Fim de semana
+                    diaInfo.observacao = 'Fim de semana';
+                    diaInfo.horasTrabalhadas = '-'; diaInfo.saldoHoras = '-';
+                } else { // Dia útil
                     const feriasDoFunc = feriasPorUsuario[funcionario.id] || [];
                     const estaDeFerias = feriasDoFunc.some(f => {
                         const inicioF = new Date(f.dataInicio + 'T00:00:00-03:00');
                         const fimF = new Date(f.dataFim + 'T23:59:59-03:00');
-                         const diaAtualNormalizado = new Date(diaString + 'T00:00:00-03:00');
+                        const diaAtualNormalizado = new Date(diaString + 'T00:00:00-03:00');
                         return diaAtualNormalizado >= inicioF && diaAtualNormalizado <= fimF;
                     });
                     if (estaDeFerias) {
@@ -1481,23 +1530,23 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
                     else if (diaInfo.registros.length === 0) {
                         diaInfo.observacao = 'Falta'; diaInfo.horasTrabalhadas = 'Falta';
                         try {
-                           const exp = getHorarioExpediente(funcionario, dataAtualLoop);
-                           const [hE,mE] = exp.entrada.split(':').map(Number);
-                           const [hS_expediente, mS_expediente] = exp.saida.split(':').map(Number); // Renomeado
-                           const jornadaMin = ((hS_expediente-hE)*60)+(mS_expediente-mE)-duracaoAlmoco;
-                           const hSaldo = Math.floor(jornadaMin/60).toString().padStart(2,'0'); // Renomeado
-                           const mSaldo = (jornadaMin%60).toString().padStart(2,'0'); // Renomeado
-                           diaInfo.saldoHoras = `-${hSaldo}h ${mSaldo}m`; // Usa renomeados
+                            const exp = getHorarioExpediente(funcionario, dataAtualLoop);
+                            const [hE, mE] = exp.entrada.split(':').map(Number);
+                            const [hS_expediente, mS_expediente] = exp.saida.split(':').map(Number); // Renomeado
+                            const jornadaMin = ((hS_expediente - hE) * 60) + (mS_expediente - mE) - duracaoAlmoco;
+                            const hSaldo = Math.floor(jornadaMin / 60).toString().padStart(2, '0'); // Renomeado
+                            const mSaldo = (jornadaMin % 60).toString().padStart(2, '0'); // Renomeado
+                            diaInfo.saldoHoras = `-${hSaldo}h ${mSaldo}m`; // Usa renomeados
                         } catch (calcError) {
                             console.error("Erro ao calcular saldo de falta (Download):", calcError);
                             diaInfo.saldoHoras = '-';
-                         }
+                        }
                     }
                     // --- FIM BLOCO CORRIGIDO ---
                     else {
                         diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(diaInfo.registros);
                         if (!diaInfo.horasTrabalhadas.includes('Jornada em aberto') && !diaInfo.horasTrabalhadas.includes('(parcial)')) {
-                             try {
+                            try {
                                 const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
                                 const [hE, mE] = expediente.entrada.split(':').map(Number);
                                 const [hS, mS] = expediente.saida.split(':').map(Number);
@@ -1513,9 +1562,9 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
                                     diaInfo.saldoHoras = `${sinal}${hSaldo}h ${mSaldo}m`;
                                 } else { diaInfo.saldoHoras = 'Erro Calc'; }
                             } catch (calcError) {
-                                 console.error("Erro calc saldo folha ponto (Download):", calcError);
-                                 diaInfo.saldoHoras = 'Erro Calc';
-                             }
+                                console.error("Erro calc saldo folha ponto (Download):", calcError);
+                                diaInfo.saldoHoras = 'Erro Calc';
+                            }
                         } else {
                             diaInfo.saldoHoras = '-';
                         }
@@ -1540,8 +1589,8 @@ app.get('/rh/relatorios/folha-ponto/download', checarAutenticacao, checarAutoriz
             const diaSemanaCsv = dia.data.toLocaleDateString('pt-BR', { weekday: 'long' });
             const registrosStr = dia.registros.map(r => `${r.tipo}: ${new Date(r.timestamp).toLocaleTimeString('pt-BR')}`).join(' | ');
 
-             // Escapa aspas na observação
-             const observacaoCsv = dia.observacao ? dia.observacao.replace(/"/g, '""') : '';
+            // Escapa aspas na observação
+            const observacaoCsv = dia.observacao ? dia.observacao.replace(/"/g, '""') : '';
 
             return `${funcionarioCsv}${dataCsv},${diaSemanaCsv},"${registrosStr}","${dia.horasTrabalhadas}","${dia.saldoHoras}","${observacaoCsv}"`;
         }).join('\n');
@@ -1661,7 +1710,7 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
 
         if (isNaN(dataInicioObj) || isNaN(dataFimObj)) {
             return res.status(400).send("Datas fornecidas são inválidas.");
-         }
+        }
 
         // --- LÓGICA DE BUSCA E PROCESSAMENTO DE DADOS ---
         const listaFuncionarios = await User.findAll({ where: { role: 'funcionario', EmpresaId: empresaId }, order: [['nome', 'ASC']] });
@@ -1688,7 +1737,7 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
         const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
         const relatorioAgrupado = [];
 
-         for (const funcionario of funcionariosParaProcessar) {
+        for (const funcionario of funcionariosParaProcessar) {
             const dadosFuncionario = { id: funcionario.id, nome: funcionario.nome, semanas: [] };
             const registrosDoFunc = registros.filter(r => r.UserId === funcionario.id);
             const feriasDoFunc = ferias.filter(f => f.UserId === funcionario.id);
@@ -1700,32 +1749,33 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
                 if (diaDaSemana >= 1 && diaDaSemana <= 5) {
                     const registrosDoDia = registrosDoFunc.filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
                     const diaInfo = { data: new Date(dataAtualLoop), registros: registrosDoDia, horasTrabalhadas: '00h 00m', saldoHoras: '', observacao: '' };
-                     const estaDeFerias = feriasDoFunc.some(f => { const inicioF=new Date(f.dataInicio+'T00:00:00-03:00'); const fimF=new Date(f.dataFim+'T23:59:59-03:00'); const diaNorm = new Date(diaString+'T00:00:00-03:00'); return diaNorm >= inicioF && diaNorm <= fimF; });
-                    if(estaDeFerias){ diaInfo.observacao = 'Férias'; diaInfo.horasTrabalhadas = '-'; diaInfo.saldoHoras = '-'; }
+                    const estaDeFerias = feriasDoFunc.some(f => { const inicioF = new Date(f.dataInicio + 'T00:00:00-03:00'); const fimF = new Date(f.dataFim + 'T23:59:59-03:00'); const diaNorm = new Date(diaString + 'T00:00:00-03:00'); return diaNorm >= inicioF && diaNorm <= fimF; });
+                    if (estaDeFerias) { diaInfo.observacao = 'Férias'; diaInfo.horasTrabalhadas = '-'; diaInfo.saldoHoras = '-'; }
                     // --- BLOCO CORRIGIDO ---
-                    else if(registrosDoDia.length === 0){ diaInfo.observacao = 'Falta'; diaInfo.horasTrabalhadas='Falta';
+                    else if (registrosDoDia.length === 0) {
+                        diaInfo.observacao = 'Falta'; diaInfo.horasTrabalhadas = 'Falta';
                         try {
-                           const exp = getHorarioExpediente(funcionario, dataAtualLoop);
-                           const [hE,mE] = exp.entrada.split(':').map(Number);
-                           const [hS_expediente, mS_expediente]=exp.saida.split(':').map(Number); // Renomeado
-                           const jornadaMin = ((hS_expediente-hE)*60)+(mS_expediente-mE)-duracaoAlmoco;
-                           const hSaldo = Math.floor(jornadaMin/60).toString().padStart(2,'0'); // Renomeado
-                           const mSaldo = (jornadaMin%60).toString().padStart(2,'0'); // Renomeado
-                           diaInfo.saldoHoras = `-${hSaldo}h ${mSaldo}m`; // Usa renomeados
-                         } catch (calcError) {
-                               console.error("Erro ao calcular saldo de falta (PDF):", calcError);
-                               diaInfo.saldoHoras = '-';
-                         }
+                            const exp = getHorarioExpediente(funcionario, dataAtualLoop);
+                            const [hE, mE] = exp.entrada.split(':').map(Number);
+                            const [hS_expediente, mS_expediente] = exp.saida.split(':').map(Number); // Renomeado
+                            const jornadaMin = ((hS_expediente - hE) * 60) + (mS_expediente - mE) - duracaoAlmoco;
+                            const hSaldo = Math.floor(jornadaMin / 60).toString().padStart(2, '0'); // Renomeado
+                            const mSaldo = (jornadaMin % 60).toString().padStart(2, '0'); // Renomeado
+                            diaInfo.saldoHoras = `-${hSaldo}h ${mSaldo}m`; // Usa renomeados
+                        } catch (calcError) {
+                            console.error("Erro ao calcular saldo de falta (PDF):", calcError);
+                            diaInfo.saldoHoras = '-';
+                        }
                     }
                     // --- FIM BLOCO CORRIGIDO ---
-                    else { diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(registrosDoDia); if(!diaInfo.horasTrabalhadas.includes('Jornada em aberto')&&!diaInfo.horasTrabalhadas.includes('(parcial)')){ try { const exp=getHorarioExpediente(funcionario, dataAtualLoop); const [hE,mE]=exp.entrada.split(':').map(Number); const [hS,mS]=exp.saida.split(':').map(Number); const jMin=((hS-hE)*60)+(mS-mE)-duracaoAlmoco; const match=diaInfo.horasTrabalhadas.match(/(\d{2})h (\d{2})m/); if(match){ const hT=parseInt(match[1],10); const mT=parseInt(match[2],10); const tMin=(hT*60)+mT; const sMin=tMin-jMin; const sig=sMin>=0?'+':'-'; const hSaldo=Math.floor(Math.abs(sMin)/60).toString().padStart(2,'0'); const mSaldo=(Math.abs(sMin)%60).toString().padStart(2,'0'); diaInfo.saldoHoras = `${sig}${hSaldo}h ${mSaldo}m`; } else { diaInfo.saldoHoras='Erro Calc'; } } catch (calcError) { console.error("Erro calc saldo folha ponto (PDF):", calcError); diaInfo.saldoHoras='Erro Calc'; } } else { diaInfo.saldoHoras = '-'; } }
+                    else { diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(registrosDoDia); if (!diaInfo.horasTrabalhadas.includes('Jornada em aberto') && !diaInfo.horasTrabalhadas.includes('(parcial)')) { try { const exp = getHorarioExpediente(funcionario, dataAtualLoop); const [hE, mE] = exp.entrada.split(':').map(Number); const [hS, mS] = exp.saida.split(':').map(Number); const jMin = ((hS - hE) * 60) + (mS - mE) - duracaoAlmoco; const match = diaInfo.horasTrabalhadas.match(/(\d{2})h (\d{2})m/); if (match) { const hT = parseInt(match[1], 10); const mT = parseInt(match[2], 10); const tMin = (hT * 60) + mT; const sMin = tMin - jMin; const sig = sMin >= 0 ? '+' : '-'; const hSaldo = Math.floor(Math.abs(sMin) / 60).toString().padStart(2, '0'); const mSaldo = (Math.abs(sMin) % 60).toString().padStart(2, '0'); diaInfo.saldoHoras = `${sig}${hSaldo}h ${mSaldo}m`; } else { diaInfo.saldoHoras = 'Erro Calc'; } } catch (calcError) { console.error("Erro calc saldo folha ponto (PDF):", calcError); diaInfo.saldoHoras = 'Erro Calc'; } } else { diaInfo.saldoHoras = '-'; } }
                     const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
                     semanaAtual[dias[diaDaSemana]] = diaInfo;
                 }
-                if (diaDaSemana === 5 || dataAtualLoop.getTime() >= dataFimObj.getTime()) { if (Object.keys(semanaAtual).length > 0) { const pData=Object.values(semanaAtual)[0]?.data; if(pData) semanaAtual.dataInicioSemana=pData; dadosFuncionario.semanas.push(semanaAtual); } semanaAtual = {}; }
+                if (diaDaSemana === 5 || dataAtualLoop.getTime() >= dataFimObj.getTime()) { if (Object.keys(semanaAtual).length > 0) { const pData = Object.values(semanaAtual)[0]?.data; if (pData) semanaAtual.dataInicioSemana = pData; dadosFuncionario.semanas.push(semanaAtual); } semanaAtual = {}; }
                 dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
             }
-             dadosFuncionario.semanas.sort((a, b) => (a.dataInicioSemana||0) - (b.dataInicioSemana||0));
+            dadosFuncionario.semanas.sort((a, b) => (a.dataInicioSemana || 0) - (b.dataInicioSemana || 0));
             relatorioAgrupado.push(dadosFuncionario);
         }
         // --- Fim Lógica de Busca ---
@@ -1753,7 +1803,7 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
                     // Continua sem logo se der erro
                 }
             } else {
-                 console.warn("Arquivo de logo não encontrado para PDF:", logoFullPath);
+                console.warn("Arquivo de logo não encontrado para PDF:", logoFullPath);
             }
         }
 
@@ -1772,22 +1822,22 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
         let browser;
         try {
             // Verifica se puppeteer está inicializado (importante devido ao async no topo)
-             if (!puppeteer || typeof puppeteer.launch !== 'function') {
-                 console.error("Puppeteer não foi inicializado corretamente. Verifique o bloco async no topo.");
-                 throw new Error("Puppeteer não inicializado.");
-             }
+            if (!puppeteer || typeof puppeteer.launch !== 'function') {
+                console.error("Puppeteer não foi inicializado corretamente. Verifique o bloco async no topo.");
+                throw new Error("Puppeteer não inicializado.");
+            }
             console.log("Iniciando Puppeteer com args:", chromiumArgs);
-             browser = await puppeteer.launch({
-                 ...chromiumArgs, // Usa args de produção ou {} localmente
-                 defaultViewport: null, // Usa viewport do format 'A4'
-                 // Adicione args extras se necessário, especialmente para Linux/Render
-                 args: [
-                     ...(chromiumArgs.args || []), // Mantém args originais
-                     '--no-sandbox',               // Comum em ambientes Linux/Docker/Serverless
-                     '--disable-setuid-sandbox',   // Comum
-                     '--disable-dev-shm-usage',    // Ajuda a evitar erros de memória compartilhada
-                     '--disable-gpu'               // Pode ajudar em ambientes sem GPU
-                 ]
+            browser = await puppeteer.launch({
+                ...chromiumArgs, // Usa args de produção ou {} localmente
+                defaultViewport: null, // Usa viewport do format 'A4'
+                // Adicione args extras se necessário, especialmente para Linux/Render
+                args: [
+                    ...(chromiumArgs.args || []), // Mantém args originais
+                    '--no-sandbox',               // Comum em ambientes Linux/Docker/Serverless
+                    '--disable-setuid-sandbox',   // Comum
+                    '--disable-dev-shm-usage',    // Ajuda a evitar erros de memória compartilhada
+                    '--disable-gpu'               // Pode ajudar em ambientes sem GPU
+                ]
             });
 
             const page = await browser.newPage();
@@ -1808,16 +1858,16 @@ app.get('/rh/relatorios/folha-ponto/pdf', checarAutenticacao, checarAutorizacaoR
             res.send(pdfBuffer);
 
         } catch (launchError) {
-             console.error("Erro CRÍTICO ao iniciar ou usar Puppeteer:", launchError);
-             if (browser) {
-                 await browser.close().catch(closeErr => console.error("Erro ao fechar browser após falha:", closeErr));
-             }
-             // Tenta identificar o erro ENOENT
-             if (launchError.message && (launchError.message.includes('ENOENT') || launchError.message.includes('Failed to launch'))) {
-                 res.status(500).send('Erro ao gerar o PDF: O navegador Chromium não foi encontrado ou falhou ao iniciar. Verifique a instalação do Puppeteer localmente ou as dependências/configurações no servidor.');
-             } else {
+            console.error("Erro CRÍTICO ao iniciar ou usar Puppeteer:", launchError);
+            if (browser) {
+                await browser.close().catch(closeErr => console.error("Erro ao fechar browser após falha:", closeErr));
+            }
+            // Tenta identificar o erro ENOENT
+            if (launchError.message && (launchError.message.includes('ENOENT') || launchError.message.includes('Failed to launch'))) {
+                res.status(500).send('Erro ao gerar o PDF: O navegador Chromium não foi encontrado ou falhou ao iniciar. Verifique a instalação do Puppeteer localmente ou as dependências/configurações no servidor.');
+            } else {
                 res.status(500).send('Ocorreu um erro inesperado ao gerar o PDF.');
-             }
+            }
         }
         // --- Fim Lógica Puppeteer ---
 

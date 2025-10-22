@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= locals.titulo || 'Erro' %></title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; text-align: center; }
+        .container { background-color: #ffffff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); max-width: 500px; }
+        h1 { color: #e74c3c; /* Vermelho erro */ margin-bottom: 15px; }
+        p { color: #555; line-height: 1.6; margin-bottom: 25px; }
+        a { background-color: #3498db; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold; transition: background-color 0.2s; }
+        a:hover { background-color: #2980b9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1><%= locals.titulo || 'Ocorreu um Erro' %></h1>
+        <p><%= locals.mensagem || 'Algo deu errado. Tente novamente mais tarde.' %></p>
+        <% if (locals.voltarLink) { %>
+            <a href="<%= voltarLink %>">Voltar</a>
+        <% } %>
+    </div>
+</body>
+</html>
