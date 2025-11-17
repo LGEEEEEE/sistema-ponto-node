@@ -44,16 +44,14 @@
             border-radius: 4px;
             font-size: 16px;
             margin-top: 10px;
-            transition: background-color 0.2s, opacity 0.2s; /* Add transition */
+            transition: background-color 0.2s, opacity 0.2s;
         }
 
-        /* Style for disabled button */
         button:disabled {
             opacity: 0.6;
             cursor: not-allowed;
-            background-color: #bdc3c7; /* Grey background */
+            background-color: #bdc3c7; 
         }
-
 
         .btn-ponto {
             background-color: #27ae60;
@@ -61,7 +59,7 @@
             width: 100%;
         }
 
-        .btn-ponto:hover:not(:disabled) { /* Only hover effect if not disabled */
+        .btn-ponto:hover:not(:disabled) {
             background-color: #229954;
         }
 
@@ -86,7 +84,7 @@
             margin-bottom: 5px;
         }
 
-        .mensagem-info, .mensagem-erro { /* Combined styles */
+        .mensagem-info, .mensagem-erro {
             padding: 10px;
             border-radius: 4px;
             margin-bottom: 15px;
@@ -95,16 +93,15 @@
         }
 
         .mensagem-erro {
-            color: #c0392b; /* Red */
+            color: #c0392b;
             background-color: #fbeae5;
         }
          .mensagem-info {
-            color: #155724; /* Green */
+            color: #155724;
             background-color: #d4edda;
-         }
+        }
 
-
-        .link-rh, .link-relatorio { /* Combine styles */
+        .link-rh, .link-relatorio {
             margin-top: 15px;
             display: block;
             text-align: center;
@@ -112,6 +109,34 @@
         .link-relatorio {
              text-decoration: underline;
              font-size: 0.9em;
+        }
+
+        /* ESTILOS DA CÂMERA */
+        .camera-box {
+            text-align: center;
+            margin-bottom: 15px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            max-width: 320px; /* Tamanho para mobile */
+            margin: 0 auto 15px auto;
+            min-height: 240px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #video-preview {
+            width: 100%;
+            height: auto;
+            display: block;
+            transform: scaleX(-1); /* Espelhar */
+        }
+        .camera-erro {
+            color: white;
+            padding: 20px;
+            display: none;
         }
     </style>
 </head>
@@ -128,16 +153,28 @@
             <p class="mensagem-erro">Você já completou as 4 batidas de ponto do dia!</p>
         <% } else if (locals.query && query.msg === 'ponto_registrado') { %>
              <p class="mensagem-info">Ponto registrado com sucesso!</p>
+        <% } else if (locals.query && query.erro === 'foto_obrigatoria') { %>
+            <p class="mensagem-erro">Você precisa permitir a câmera para bater o ponto!</p>
+        <% } else if (locals.query && query.erro === 'falha_geral') { %>
+             <p class="mensagem-erro">Ocorreu um erro ao enviar. Tente novamente.</p>
         <% } %>
 
-        <form id="form-registrar-ponto" action="/registrar" method="POST">
-            <button id="btn-bater-ponto" type="submit" class="btn-ponto">BATER PONTO AGORA</button>
+        <div class="camera-box">
+            <video id="video-preview" autoplay playsinline muted></video>
+            <div id="camera-erro-msg" class="camera-erro">Aguardando permissão da câmera...</div>
+        </div>
+        
+        <canvas id="canvas-capture" style="display: none;"></canvas>
+
+        <form id="form-registrar-ponto">
+            <button id="btn-bater-ponto" type="submit" class="btn-ponto" disabled>INICIANDO CÂMERA...</button>
         </form>
+        
         <hr>
 
         <h3>Seus registros de hoje:</h3>
         <ul class="registros-lista">
-            <% if (registros && registros.length > 0) { %> <%# Adicionado check locals.registros %>
+            <% if (registros && registros.length > 0) { %>
                 <% registros.forEach(registro => { %>
                     <li><strong><%= registro.tipo %>:</strong>
                         <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %>
@@ -163,42 +200,94 @@
     </div>
 
     <script>
-        const formRegistrar = document.getElementById('form-registrar-ponto');
+        const video = document.getElementById('video-preview');
+        const canvas = document.getElementById('canvas-capture');
         const btnBaterPonto = document.getElementById('btn-bater-ponto');
-        let isSubmitting = false; // Flag para evitar múltiplos envios
+        const formRegistrar = document.getElementById('form-registrar-ponto');
+        const cameraErroMsg = document.getElementById('camera-erro-msg');
+        let streamAtivo = null;
 
-        // Verifica se o ciclo já foi finalizado (pela mensagem na URL)
-        const urlParams = new URLSearchParams(window.location.search);
-        const cicloFinalizado = urlParams.get('mensagem') === 'ciclo_finalizado';
-
-        if (cicloFinalizado) {
-            btnBaterPonto.disabled = true; // Desabilita o botão se já bateu 4x
-            btnBaterPonto.textContent = 'CICLO DO DIA FINALIZADO';
+        // 1. INICIAR CÂMERA AO CARREGAR
+        async function iniciarCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: { ideal: 640 } } 
+                });
+                video.srcObject = stream;
+                streamAtivo = stream;
+                
+                // Quando o vídeo começar a tocar, habilita o botão
+                video.onloadedmetadata = () => {
+                    video.play(); // Garante play em mobile
+                    
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const cicloFinalizado = urlParams.get('mensagem') === 'ciclo_finalizado';
+                    
+                    if (!cicloFinalizado) {
+                        btnBaterPonto.disabled = false;
+                        btnBaterPonto.textContent = 'BATER PONTO AGORA';
+                    } else {
+                        btnBaterPonto.textContent = 'CICLO DO DIA FINALIZADO';
+                    }
+                };
+            } catch (err) {
+                console.error("Erro na câmera:", err);
+                video.style.display = 'none';
+                cameraErroMsg.style.display = 'block';
+                cameraErroMsg.textContent = 'Erro: Você precisa permitir a câmera para bater o ponto.';
+                btnBaterPonto.textContent = 'CÂMERA BLOQUEADA';
+            }
         }
 
+        // Inicia imediatamente
+        iniciarCamera();
+
+        // 2. ENVIO DO FORMULÁRIO
         formRegistrar.addEventListener('submit', function(event) {
-            // 1. Previne o envio padrão imediatamente
             event.preventDefault();
 
-            // 2. Verifica se já está enviando ou se o botão está desabilitado
-            if (isSubmitting || btnBaterPonto.disabled) {
-                return; // Impede novo envio
-            }
+            if (btnBaterPonto.disabled) return;
 
-            // 3. Mostra a confirmação
-            const querRegistrar = confirm("Confirmar registro de ponto?");
+            if (!confirm("Confirmar registro de ponto com foto?")) return;
 
-            // 4. Se confirmado, envia o formulário
-            if (querRegistrar) {
-                isSubmitting = true; // Define a flag
-                btnBaterPonto.disabled = true; // Desabilita o botão visualmente
-                btnBaterPonto.textContent = 'Registrando...'; // Feedback visual
+            btnBaterPonto.disabled = true;
+            btnBaterPonto.textContent = 'Enviando foto...';
 
-                // Envia o formulário programaticamente
-                formRegistrar.submit();
-            }
-            // Se não confirmar (clicar em Cancelar), não faz nada.
+            // Captura o frame do vídeo no canvas
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            
+            // Desenha espelhado para ficar igual ao preview
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Converte canvas para Blob (arquivo JPG)
+            canvas.toBlob(function(blob) {
+                const formData = new FormData();
+                formData.append('foto', blob, 'selfie.jpg'); 
+
+                // Envia via Fetch
+                fetch('/registrar', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url; 
+                    } else {
+                        window.location.reload();
+                    }
+                })
+                .catch(err => {
+                    console.error("Erro no envio:", err);
+                    alert("Erro de conexão ao enviar. Tente novamente.");
+                    btnBaterPonto.disabled = false;
+                    btnBaterPonto.textContent = 'TENTAR NOVAMENTE';
+                });
+            }, 'image/jpeg', 0.7); // Qualidade 70% para ser rápido
         });
     </script>
-     </body>
+</body>
 </html>
