@@ -785,15 +785,29 @@ app.post('/rh/empresa/editar', checarAutenticacao, checarAutorizacaoRH, async (r
 
         const t = await sequelize.transaction();
         try {
+            // 1. Atualiza dados da empresa
             await Empresa.update({ nome, cnpj }, { where: { id: empresaId }, transaction: t });
-            await Configuracao.upsert({
-                chave: 'allowed_ips',
-                valor: (allowedIps || '').trim(), 
-                EmpresaId: empresaId
-            }, { transaction: t });
+
+            // 2. CORREÇÃO: Busca se já existe configuração para evitar duplicatas
+            const configExistente = await Configuracao.findOne({
+                where: { chave: 'allowed_ips', EmpresaId: empresaId },
+                transaction: t
+            });
+
+            if (configExistente) {
+                // Se existe, ATUALIZA
+                await configExistente.update({ valor: (allowedIps || '').trim() }, { transaction: t });
+            } else {
+                // Se não existe, CRIA
+                await Configuracao.create({
+                    chave: 'allowed_ips',
+                    valor: (allowedIps || '').trim(),
+                    EmpresaId: empresaId
+                }, { transaction: t });
+            }
 
             await t.commit(); 
-            res.json({ success: true, message: 'Dados atualizados!' });
+            res.json({ success: true, message: 'Dados atualizados com sucesso!' });
         } catch (innerError) {
             await t.rollback(); 
             throw innerError; 
