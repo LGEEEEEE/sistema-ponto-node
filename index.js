@@ -208,38 +208,76 @@ async function checarAutorizacaoRH(req, res, next) {
     }
 }
 
+// --- FUNÇÃO RESTRINGIR POR IP (COM DEPURAÇÃO E AUTO-CORREÇÃO) ---
 async function restringirPorIP(req, res, next) {
     try {
-        const empresaId = req.session.empresaId;
-        if (!empresaId) return res.redirect('/login?erro=sessao_invalida');
+        console.log(`[DEBUG IP] Iniciando verificação para UserID: ${req.session.userId}`);
 
+        // 1. Tenta pegar da sessão
+        let empresaId = req.session.empresaId;
+
+        // 2. AUTO-CORREÇÃO: Se não tiver na sessão, busca no Banco
+        if (!empresaId && req.session.userId) {
+            console.warn("[DEBUG IP] EmpresaId não encontrado na sessão. Tentando recuperar do Banco...");
+            const user = await User.findByPk(req.session.userId);
+            
+            if (user && user.EmpresaId) {
+                req.session.empresaId = user.EmpresaId; // Salva na sessão para a próxima
+                empresaId = user.EmpresaId;
+                console.log(`[DEBUG IP] Recuperado com sucesso! EmpresaId: ${empresaId}`);
+            } else {
+                console.error("[DEBUG IP] ERRO CRÍTICO: Usuário existe mas não tem Empresa vinculada no BD.");
+                // Opcional: Vincular à empresa 1 se for um ambiente de teste quebrado
+                // if (process.env.NODE_ENV !== 'production') { req.session.empresaId = 1; empresaId = 1; }
+            }
+        }
+
+        // 3. Se ainda assim não tiver empresa, falha
+        if (!empresaId) {
+            console.error("[DEBUG IP] Falha total. Redirecionando para login.");
+            return req.session.destroy(() => {
+                res.redirect('/login?erro=sessao_invalida_sem_empresa');
+            });
+        }
+
+        // 4. Busca Configuração de IP
         const configIp = await Configuracao.findOne({
             where: { chave: 'allowed_ips', EmpresaId: empresaId }
         });
 
-        // Se não tem config ou está vazia, libera
+        // Se não há configuração de IP ou está vazia, permite o acesso
         if (!configIp || !configIp.valor || configIp.valor.trim() === '') {
+            console.log("[DEBUG IP] Sem restrição de IP configurada. Acesso liberado.");
             return next();
         }
 
+        // 5. Validação do IP
         const allowedIps = configIp.valor.split(',').map(ip => ip.trim()).filter(ip => ip);
         const userIp = req.ip; 
-        const devIps = ['::1', '127.0.0.1']; 
+        // Adiciona ::1 e 127.0.0.1 para garantir que local funcione
+        const devIps = ['::1', '127.0.0.1', '::ffff:127.0.0.1']; 
 
-        if (allowedIps.includes(userIp) || (process.env.NODE_ENV !== 'production' && devIps.includes(userIp))) {
-            next(); 
+        console.log(`[DEBUG IP] IP do Usuário: ${userIp} | IPs Permitidos: ${allowedIps.join(', ')}`);
+
+        const isDev = process.env.NODE_ENV !== 'production';
+        const ipPermitido = allowedIps.includes(userIp);
+        const isLocalhost = devIps.includes(userIp);
+
+        if (ipPermitido || (isDev && isLocalhost)) {
+            next(); // SUCESSO
         } else {
+            console.warn(`[DEBUG IP] BLOQUEADO. IP ${userIp} não está na lista.`);
             res.status(403).render('erro_generico', {
                 titulo: 'Acesso Negado por Rede',
-                mensagem: `Registro não permitido deste IP (${userIp}). Por favor, utilize a rede da empresa.`,
+                mensagem: `Registro de ponto não permitido a partir desta localização (${userIp}).`,
                 voltarLink: '/dashboard'
             });
         }
     } catch (error) {
-        console.error("Erro IP:", error);
+        console.error("Erro CRÍTICO ao verificar restrição de IP:", error);
         res.status(500).render('erro_generico', {
             titulo: 'Erro Interno',
-            mensagem: 'Falha ao verificar IP.',
+            mensagem: 'Falha ao verificar permissão de acesso pela rede.',
             voltarLink: '/dashboard'
         });
     }
