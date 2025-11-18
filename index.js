@@ -466,14 +466,16 @@ app.post('/logout', (req, res) => {
     });
 });
 
-// --- Relatório do Funcionário ---
+// --- Rota Meu Relatório (Funcionário) ---
 app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
     try {
         const { userId, empresaId } = req.session;
         const { dataInicio, dataFim } = req.query;
 
         const hoje = new Date();
+        // Define o início do mês atual como padrão se não houver dataInicio
         const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0];
+        // Define o dia de hoje como padrão se não houver dataFim
         const hojeStr = hoje.toISOString().split('T')[0];
 
         const dataInicioSelecionada = dataInicio || inicioMes;
@@ -482,6 +484,7 @@ app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
         const funcionario = await User.findByPk(userId);
         if (!funcionario) return res.status(404).send("Funcionário não encontrado.");
 
+        // A lógica de busca e agrupamento de dados
         const dataInicioObj = new Date(`${dataInicioSelecionada}T00:00:00-03:00`);
         const dataFimObj = new Date(`${dataFimSelecionada}T23:59:59-03:00`);
 
@@ -490,7 +493,7 @@ app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
                 relatorioAgrupado: null,
                 dataInicioSelecionada: hojeStr,
                 dataFimSelecionada: hojeStr,
-                error: "Datas inválidas."
+                error: "Datas inválidas fornecidas."
             });
         }
 
@@ -501,24 +504,28 @@ app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
         ]);
 
         const duracaoAlmoco = configAlmoco ? parseInt(configAlmoco.valor, 10) : 60;
+
         const dadosFuncionario = { semanas: [] };
         let semanaAtual = {};
         let dataAtualLoop = new Date(dataInicioObj); 
 
         while (dataAtualLoop <= dataFimObj) {
-            const diaDaSemana = dataAtualLoop.getDay(); 
+            const diaDaSemana = dataAtualLoop.getDay(); // 0 = Domingo, ... 6 = Sábado
             const diaString = dataAtualLoop.toISOString().split('T')[0];
 
+            // Considera apenas dias úteis (Segunda a Sexta)
             if (diaDaSemana >= 1 && diaDaSemana <= 5) {
                 const registrosDoDia = registros.filter(r => new Date(r.timestamp).toISOString().split('T')[0] === diaString);
+                
                 const diaInfo = {
-                    data: new Date(dataAtualLoop), 
+                    data: new Date(dataAtualLoop), // Guarda o objeto Date
                     registros: registrosDoDia,
                     horasTrabalhadas: '00h 00m',
                     saldoHoras: '',
                     observacao: ''
                 };
 
+                // Verifica se está de férias neste dia
                 const estaDeFerias = ferias.some(f => {
                     const inicioF = new Date(f.dataInicio + 'T00:00:00-03:00');
                     const fimF = new Date(f.dataFim + 'T23:59:59-03:00');
@@ -533,6 +540,7 @@ app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
                 } else if (registrosDoDia.length === 0) {
                     diaInfo.observacao = 'Falta';
                     diaInfo.horasTrabalhadas = 'Falta';
+                    // Calcula o saldo negativo da falta
                     try {
                         const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
                         const [hE, mE] = expediente.entrada.split(':').map(Number);
@@ -541,21 +549,24 @@ app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
                         const hSaldo = Math.floor(jornadaMin / 60).toString().padStart(2, '0');
                         const mSaldo = (jornadaMin % 60).toString().padStart(2, '0');
                         diaInfo.saldoHoras = `-${hSaldo}h ${mSaldo}m`;
-                    } catch { diaInfo.saldoHoras = '-'; } 
+                    } catch { diaInfo.saldoHoras = '-'; } // Fallback
                 } else {
                     diaInfo.horasTrabalhadas = calcularHorasTrabalhadas(registrosDoDia);
+                    // Só calcula saldo se a jornada não estiver aberta ou parcial
                     if (!diaInfo.horasTrabalhadas.includes('Jornada em aberto') && !diaInfo.horasTrabalhadas.includes('(parcial)')) {
                         try {
                             const expediente = getHorarioExpediente(funcionario, dataAtualLoop);
                             const [hE, mE] = expediente.entrada.split(':').map(Number);
                             const [hS, mS] = expediente.saida.split(':').map(Number);
                             const jornadaMin = ((hS - hE) * 60) + (mS - mE) - duracaoAlmoco;
+
                             const match = diaInfo.horasTrabalhadas.match(/(\d{2})h (\d{2})m/);
                             if (match) {
                                 const hT = parseInt(match[1], 10);
                                 const mT = parseInt(match[2], 10);
                                 const trabalhadoMin = (hT * 60) + mT;
                                 const saldoMin = trabalhadoMin - jornadaMin;
+
                                 const sinal = saldoMin >= 0 ? '+' : '-';
                                 const hSaldo = Math.floor(Math.abs(saldoMin) / 60).toString().padStart(2, '0');
                                 const mSaldo = (Math.abs(saldoMin) % 60).toString().padStart(2, '0');
@@ -564,26 +575,36 @@ app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
                                 diaInfo.saldoHoras = 'Erro Calc'; 
                             }
                         } catch (calcError) {
+                            console.error("Erro calc saldo:", calcError);
                             diaInfo.saldoHoras = 'Erro Calc';
                         }
                     } else {
                         diaInfo.saldoHoras = '-'; 
                     }
                 }
+
+                // Adiciona ao objeto da semana atual
                 const dias = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'];
                 semanaAtual[dias[diaDaSemana]] = diaInfo;
             }
 
-            if (diaDaSemana === 5 || dataAtualLoop.getTime() === dataFimObj.getTime() || dataAtualLoop > dataFimObj) {
+            // --- CORREÇÃO PRINCIPAL AQUI ---
+            // Fecha a semana se for Sexta-feira (5) OU se for o último dia do filtro selecionado
+            if (diaDaSemana === 5 || diaString === dataFimSelecionada) {
                 if (Object.keys(semanaAtual).length > 0) {
+                    // Pega a data do primeiro registro da semana para ordenar depois
                     const primeiraDataDaSemana = Object.values(semanaAtual)[0].data;
                     semanaAtual.dataInicioSemana = primeiraDataDaSemana;
                     dadosFuncionario.semanas.push(semanaAtual);
                 }
-                semanaAtual = {}; 
+                semanaAtual = {}; // Reseta para a próxima semana
             }
+
+            // Incrementa o dia
             dataAtualLoop.setDate(dataAtualLoop.getDate() + 1);
         }
+
+        // Ordena as semanas
         dadosFuncionario.semanas.sort((a, b) => a.dataInicioSemana - b.dataInicioSemana);
 
         res.render('meu_relatorio', {
@@ -591,9 +612,15 @@ app.get('/meu-relatorio', checarAutenticacao, async (req, res) => {
             dataInicioSelecionada: dataInicioSelecionada,
             dataFimSelecionada: dataFimSelecionada
         });
+
     } catch (error) {
-        console.error("Erro relatório func:", error);
-        res.status(500).send("Erro ao gerar relatório.");
+        console.error("Erro ao gerar relatório do funcionário:", error);
+        res.status(500).render('meu_relatorio', {
+            relatorioAgrupado: null,
+            dataInicioSelecionada: dataInicio || new Date().toISOString().split('T')[0], 
+            dataFimSelecionada: dataFim || new Date().toISOString().split('T')[0],
+            error: "Ocorreu um erro ao gerar o relatório. Tente novamente."
+        });
     }
 });
 
