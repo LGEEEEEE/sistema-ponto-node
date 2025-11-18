@@ -636,7 +636,9 @@ app.get('/dashboard', checarAutenticacao, async (req, res) => {
                 UserId: req.session.userId,
                 timestamp: { [Op.between]: [inicioDoDia, fimDoDia] }
             },
-            order: [['timestamp', 'ASC']]
+            order: [['timestamp', 'ASC']],
+            raw: true, // <--- ADICIONE ISSO! (Acelera a leitura)
+            nest: true // <--- Ajuda se tiver 'include' (joins)
         });
         res.render('dashboard', { user, registros, query: req.query });
     } catch (error) {

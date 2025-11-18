@@ -5,10 +5,12 @@
     <meta charset="UTF-8">
     <title>Dashboard do Funcionário</title>
     <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 2em;
+            margin: 0; /* Reset margem para mobile */
+            padding: 20px;
             background-color: #f9f9f9;
             color: #333;
         }
@@ -22,8 +24,7 @@
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
         }
 
-        h1,
-        h3 {
+        h1, h3 {
             color: #2c3e50;
         }
 
@@ -38,7 +39,7 @@
         }
 
         button {
-            padding: 10px 15px;
+            padding: 12px 15px; /* Botões maiores para toque */
             cursor: pointer;
             border: none;
             border-radius: 4px;
@@ -57,6 +58,7 @@
             background-color: #27ae60;
             color: white;
             width: 100%;
+            font-weight: bold;
         }
 
         .btn-ponto:hover:not(:disabled) {
@@ -66,6 +68,7 @@
         .btn-logout {
             background-color: #e74c3c;
             color: white;
+            width: 100%; /* Botão sair full width no mobile */
         }
 
         .btn-logout:hover {
@@ -79,15 +82,17 @@
 
         .registros-lista li {
             background-color: #f2f2f2;
-            padding: 10px;
+            padding: 12px;
             border-radius: 4px;
-            margin-bottom: 5px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between; /* Alinha tipo e hora */
         }
 
         .mensagem-info, .mensagem-erro {
-            padding: 10px;
+            padding: 15px;
             border-radius: 4px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             text-align: center;
             font-weight: bold;
         }
@@ -95,20 +100,24 @@
         .mensagem-erro {
             color: #c0392b;
             background-color: #fbeae5;
+            border: 1px solid #f5c6cb;
         }
          .mensagem-info {
             color: #155724;
             background-color: #d4edda;
+            border: 1px solid #c3e6cb;
         }
 
         .link-rh, .link-relatorio {
-            margin-top: 15px;
+            margin-top: 20px;
             display: block;
             text-align: center;
+            color: #3498db;
+            text-decoration: none;
         }
         .link-relatorio {
              text-decoration: underline;
-             font-size: 0.9em;
+             font-size: 0.95em;
         }
 
         /* ESTILOS DA CÂMERA */
@@ -120,16 +129,18 @@
             overflow: hidden;
             position: relative;
             width: 100%;
-            max-width: 320px; /* Tamanho para mobile */
-            margin: 0 auto 15px auto;
+            max-width: 320px; /* Tamanho ideal */
+            margin: 0 auto 20px auto;
             min-height: 240px;
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
         #video-preview {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover; /* Preenche o quadrado sem distorcer */
             display: block;
             transform: scaleX(-1); /* Espelhar */
         }
@@ -137,6 +148,7 @@
             color: white;
             padding: 20px;
             display: none;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -152,11 +164,11 @@
         <% if (locals.query && query.mensagem === 'ciclo_finalizado') { %>
             <p class="mensagem-erro">Você já completou as 4 batidas de ponto do dia!</p>
         <% } else if (locals.query && query.msg === 'ponto_registrado') { %>
-             <p class="mensagem-info">Ponto registrado com sucesso!</p>
+             <p class="mensagem-info">✅ Ponto registrado com sucesso!</p>
         <% } else if (locals.query && query.erro === 'foto_obrigatoria') { %>
-            <p class="mensagem-erro">Você precisa permitir a câmera para bater o ponto!</p>
+            <p class="mensagem-erro">📸 Você precisa permitir a câmera para bater o ponto!</p>
         <% } else if (locals.query && query.erro === 'falha_geral') { %>
-             <p class="mensagem-erro">Ocorreu um erro ao enviar. Tente novamente.</p>
+             <p class="mensagem-erro">❌ Ocorreu um erro ao enviar. Tente novamente.</p>
         <% } %>
 
         <div class="camera-box">
@@ -176,24 +188,25 @@
         <ul class="registros-lista">
             <% if (registros && registros.length > 0) { %>
                 <% registros.forEach(registro => { %>
-                    <li><strong><%= registro.tipo %>:</strong>
-                        <%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' }) %>
+                    <li>
+                        <strong><%= registro.tipo %></strong>
+                        <span><%= new Date(registro.timestamp).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }) %></span>
                     </li>
                 <% }) %>
             <% } else { %>
-                <li>Nenhum registro hoje.</li>
+                <li style="text-align: center; color: #777;">Nenhum registro hoje.</li>
             <% } %>
         </ul>
 
         <hr>
 
+        <a href="/meu-relatorio" class="link-relatorio">Ver meu relatório detalhado</a>
+
         <% if (locals.user && user.role === 'rh') { %>
             <a href="/rh/dashboard" class="link-rh">Acessar Área do RH</a>
         <% } %>
 
-         <a href="/meu-relatorio" class="link-relatorio">Ver meu relatório detalhado</a>
-
-        <form action="/logout" method="POST" style="margin-top: 15px;">
+        <form action="/logout" method="POST" style="margin-top: 20px;">
             <button type="submit" class="btn-logout">Sair</button>
         </form>
 
@@ -210,15 +223,20 @@
         // 1. INICIAR CÂMERA AO CARREGAR
         async function iniciarCamera() {
             try {
+                // Tenta câmera frontal com resolução ideal balanceada
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: 'user', width: { ideal: 640 } } 
+                    video: { 
+                        facingMode: 'user', 
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    } 
                 });
                 video.srcObject = stream;
                 streamAtivo = stream;
                 
                 // Quando o vídeo começar a tocar, habilita o botão
                 video.onloadedmetadata = () => {
-                    video.play(); // Garante play em mobile
+                    video.play(); // Garante play em mobile (iOS requer isso)
                     
                     const urlParams = new URLSearchParams(window.location.search);
                     const cicloFinalizado = urlParams.get('mensagem') === 'ciclo_finalizado';
@@ -234,7 +252,7 @@
                 console.error("Erro na câmera:", err);
                 video.style.display = 'none';
                 cameraErroMsg.style.display = 'block';
-                cameraErroMsg.textContent = 'Erro: Você precisa permitir a câmera para bater o ponto.';
+                cameraErroMsg.textContent = 'Erro: Você precisa permitir a câmera no navegador para registrar o ponto.';
                 btnBaterPonto.textContent = 'CÂMERA BLOQUEADA';
             }
         }
@@ -242,9 +260,7 @@
         // Inicia imediatamente
         iniciarCamera();
 
-        // ... (código anterior da câmera) ...
-
-        // 2. ENVIO DO FORMULÁRIO CORRIGIDO
+        // 2. ENVIO DO FORMULÁRIO COM OTIMIZAÇÃO DE IMAGEM
         formRegistrar.addEventListener('submit', function(event) {
             event.preventDefault();
 
@@ -253,19 +269,24 @@
             if (!confirm("Confirmar registro de ponto com foto?")) return;
 
             btnBaterPonto.disabled = true;
-            btnBaterPonto.textContent = 'Enviando foto...';
+            btnBaterPonto.textContent = 'Processando e enviando...';
 
-            // Captura o frame do vídeo no canvas
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
+            // --- OTIMIZAÇÃO: Reduzir tamanho da imagem ---
+            const larguraFinal = 320; // 320px é suficiente para reconhecimento e muito leve
+            const escala = larguraFinal / video.videoWidth;
+            const alturaFinal = video.videoHeight * escala;
+
+            canvas.width = larguraFinal;
+            canvas.height = alturaFinal;
             const ctx = canvas.getContext('2d');
             
-            // Desenha espelhado
+            // Desenha espelhado (para ficar igual ao preview que o usuário vê)
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
+            // Desenha a imagem redimensionada
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Converte canvas para Blob
+            // Converte canvas para Blob (arquivo JPG comprimido)
             canvas.toBlob(function(blob) {
                 const formData = new FormData();
                 formData.append('foto', blob, 'selfie.jpg'); 
@@ -286,19 +307,19 @@
                     if (!response.ok) {
                         const textoResposta = await response.text();
                         
-                        // Se a resposta for uma página HTML (nossa página de erro)
+                        // Se a resposta for uma página HTML (nossa página de erro generico)
                         if (textoResposta.includes('<!DOCTYPE html>')) {
                             document.open();
-                            document.write(textoResposta); // <-- AQUI ESTÁ A MÁGICA
+                            document.write(textoResposta); // Renderiza o HTML de erro do servidor
                             document.close();
                         } else {
                             // Se for um erro de texto simples
-                            alert("Erro: " + textoResposta);
+                            alert("Erro do Servidor: " + textoResposta);
                             btnBaterPonto.disabled = false;
                             btnBaterPonto.textContent = 'TENTAR NOVAMENTE';
                         }
                     } else {
-                        // Caso raro onde é OK mas não redirecionou
+                        // Caso raro onde é OK mas não redirecionou (reload por segurança)
                         window.location.reload();
                     }
                 })
@@ -308,7 +329,7 @@
                     btnBaterPonto.disabled = false;
                     btnBaterPonto.textContent = 'TENTAR NOVAMENTE';
                 });
-            }, 'image/jpeg', 0.7);
+            }, 'image/jpeg', 0.6); // Qualidade 60% (Equilíbrio perfeito entre tamanho e visualização)
         });
     </script>
 </body>
