@@ -242,7 +242,9 @@
         // Inicia imediatamente
         iniciarCamera();
 
-        // 2. ENVIO DO FORMULÁRIO
+        // ... (código anterior da câmera) ...
+
+        // 2. ENVIO DO FORMULÁRIO CORRIGIDO
         formRegistrar.addEventListener('submit', function(event) {
             event.preventDefault();
 
@@ -258,12 +260,12 @@
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             
-            // Desenha espelhado para ficar igual ao preview
+            // Desenha espelhado
             ctx.translate(canvas.width, 0);
             ctx.scale(-1, 1);
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-            // Converte canvas para Blob (arquivo JPG)
+            // Converte canvas para Blob
             canvas.toBlob(function(blob) {
                 const formData = new FormData();
                 formData.append('foto', blob, 'selfie.jpg'); 
@@ -273,20 +275,40 @@
                     method: 'POST',
                     body: formData
                 })
-                .then(response => {
+                .then(async response => {
+                    // SE FOR REDIRECIONAMENTO (SUCESSO)
                     if (response.redirected) {
                         window.location.href = response.url; 
+                        return;
+                    }
+
+                    // SE FOR ERRO (403, 500, etc)
+                    if (!response.ok) {
+                        const textoResposta = await response.text();
+                        
+                        // Se a resposta for uma página HTML (nossa página de erro)
+                        if (textoResposta.includes('<!DOCTYPE html>')) {
+                            document.open();
+                            document.write(textoResposta); // <-- AQUI ESTÁ A MÁGICA
+                            document.close();
+                        } else {
+                            // Se for um erro de texto simples
+                            alert("Erro: " + textoResposta);
+                            btnBaterPonto.disabled = false;
+                            btnBaterPonto.textContent = 'TENTAR NOVAMENTE';
+                        }
                     } else {
+                        // Caso raro onde é OK mas não redirecionou
                         window.location.reload();
                     }
                 })
                 .catch(err => {
                     console.error("Erro no envio:", err);
-                    alert("Erro de conexão ao enviar. Tente novamente.");
+                    alert("Erro de conexão ao enviar. Verifique sua internet.");
                     btnBaterPonto.disabled = false;
                     btnBaterPonto.textContent = 'TENTAR NOVAMENTE';
                 });
-            }, 'image/jpeg', 0.7); // Qualidade 70% para ser rápido
+            }, 'image/jpeg', 0.7);
         });
     </script>
 </body>
